@@ -92,6 +92,33 @@ export async function createSession(
 }
 
 /**
+ * Secure flag for the session cookie.
+ *
+ * Default stays environment-driven: production builds mark the cookie Secure
+ * so the raw session token never rides plaintext HTTP. COOKIE_SECURE exists
+ * for local self-host stacks that front the app with plain HTTP — Safari
+ * refuses Set-Cookie carrying Secure over http://, so sign-in would
+ * silently no-op there. "false" drops the flag, "true" forces it on;
+ * anything else (including unset) keeps the automatic behavior. Never
+ * disable Secure on a deployment reachable beyond the local machine —
+ * that flag is the only thing keeping the session token off plaintext HTTP.
+ */
+export function sessionCookieSecure(
+  nodeEnv: string | undefined,
+  cookieSecure: string | undefined
+): boolean {
+  const override = cookieSecure?.trim().toLowerCase();
+  if (override === "false") return false;
+  if (override === "true") return true;
+  if (override) {
+    console.error(
+      `[auth] COOKIE_SECURE="${cookieSecure}" is not true/false; falling back to automatic (Secure iff NODE_ENV=production)`
+    );
+  }
+  return nodeEnv === "production";
+}
+
+/**
  * Set session cookie.
  */
 export async function setSessionCookie(token: string): Promise<void> {
@@ -99,7 +126,7 @@ export async function setSessionCookie(token: string): Promise<void> {
 
   cookieStore.set(SESSION_COOKIE_NAME, token, {
     httpOnly: true,
-    secure: process.env.NODE_ENV === "production",
+    secure: sessionCookieSecure(process.env.NODE_ENV, process.env.COOKIE_SECURE),
     sameSite: "lax",
     maxAge: SESSION_DURATION_MS / 1000,
     path: "/",
