@@ -109,9 +109,13 @@ export function fixtureUser(runId: string, slot: "a" | "b" | "c"): FixtureUser {
  * browser context's cookie jar, so the returned httpOnly `tt_session` is
  * stored for subsequent page loads in this test.
  */
-export async function registerUser(page: Page, user: FixtureUser): Promise<void> {
+export async function registerUser(
+  page: Page,
+  user: FixtureUser,
+  extraHeaders?: Record<string, string>
+): Promise<void> {
   const res = await page.request.post("/api/auth/register", {
-    headers: { Origin: "http://localhost:3000" },
+    headers: { Origin: "http://localhost:3000", ...extraHeaders },
     data: { email: user.email, username: user.username, password: user.password },
   });
   expect(

@@ -3,7 +3,7 @@ import * as email from "./send";
 
 // Resolve dynamically so the initial red state is an assertion, not an import error.
 const parse = (env: Record<string, string | undefined>) =>
-  (email as unknown as { resolveEmailTransport: (env: Record<string, string | undefined>) => any }).resolveEmailTransport(env);
+  (email as unknown as { resolveEmailTransport: (env: Record<string, string | undefined>) => ReturnType<typeof email.resolveEmailTransport> }).resolveEmailTransport(env);
 
 describe("email transport selection", () => {
   test("selection: smtp host alone selects smtp transport", () => {

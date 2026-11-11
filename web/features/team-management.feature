@@ -195,6 +195,107 @@ Feature: 团队管理
       When "songlin" 打开邀请对话框
       Then 可以看到可选的自动归入分组选择器
 
+  Rule: 受邀人在团队页查看待处理邀请
+
+    邀请区是单容器，每条 pending 且未过期的邀请渲染为一项。
+    展示不依赖用户的团队归属状态；目标团队解散的邀请照常展示，不加区分提示。
+
+    Scenario: 有待处理邀请时显示邀请区
+      Given "mikoto" 名下有一条 "Neon Ravens" 的 pending 邀请，expiresAt 为当前时间加 3 天
+      When "mikoto" 打开 /teams
+      Then 页面渲染邀请区，可见文本包含 "Neon Ravens"
+      And 该项的到期元素 data-testid="invite-expires" 的 data-expires 等于该 expiresAt 的 ISO UTC 日期
+      And 该项含「接受」按钮
+      And 该项不含「拒绝」按钮
+
+    Scenario: 已在团队时邀请区仍显示
+      Given "mikoto" 已属于团队 "Sky Wolves"
+      And "mikoto" 名下另有 "Neon Ravens" 的一条 pending 邀请
+      When "mikoto" 打开 /teams
+      Then 页面同时渲染 "Sky Wolves" 团队面板和含 "Neon Ravens" 一项的邀请区
+
+    Scenario: 过期邀请不渲染
+      Given "mikoto" 名下只有一条已过期的邀请
+      When "mikoto" 打开 /teams
+      Then 页面不渲染邀请区
+
+  Rule: 受邀人接受待处理邀请
+
+    「接受」调用 POST /api/invitations/{id}/accept。成功后页面刷新，
+    该条邀请从邀请区移除；邀请区仅当无剩余待处理邀请时消失。
+    失败时显示既有本地化文案，服务端校验逻辑不变。
+
+    Scenario: 接受成功入团
+      Given 无团队的 "mikoto" 在邀请区看到 "Neon Ravens" 一项，名下无其他邀请
+      When "mikoto" 点「接受」
+      Then POST /api/invitations/{id}/accept 返回 200
+      And 页面刷新为 "Neon Ravens" 团队面板
+      And 整个邀请区消失
+
+    Scenario: 多条邀请时接受其一
+      Given "mikoto" 名下有 "Neon Ravens" 和 "Sky Wolves" 两条 pending 邀请
+      When "mikoto" 接受 "Neon Ravens"
+      Then "Neon Ravens" 一项从邀请区移除
+      And "Sky Wolves" 一项仍显示
+
+    Scenario: 已在团队时接受被阻断
+      Given "mikoto" 已属于 "Sky Wolves"，名下有 "Neon Ravens" 的 pending 邀请
+      When "mikoto" 点「接受」
+      Then 界面显示 teams.err.leaveBeforeAccept 对应的本地化提示
+      And 邀请区该项保留
+
+    Scenario: 未验证邮箱时接受被阻断
+      Given "mikoto" 未验证邮箱，名下有一条按邮箱地址发出的 pending 邀请
+      When "mikoto" 点「接受」
+      Then 界面显示 teams.err.verifyEmailFirst 对应的本地化提示
+      And team_members 表不新增行
+
+    Scenario: 页面停留期间邀请过期
+      Given "mikoto" 打开 /teams 时看到一条 pending 邀请，该邀请在其停留期间到达 expiresAt
+      When "mikoto" 点「接受」
+      Then 界面显示 teams.err.inviteExpired 对应的本地化提示
+      And team_members 表不新增行
+
+    Scenario: 目标团队已解散时接受被阻断
+      Given "mikoto" 名下有一条 pending 邀请，其目标团队状态为 disbanded
+      When "mikoto" 打开 /teams 并点「接受」
+      Then 邀请区照常展示该邀请
+      And 界面显示 teams.err.notActive 对应的本地化提示
+      And team_members 表不新增行
+
+  Rule: 邀请邮件链接携带回跳参数直达团队页
+
+    链接主机取 NEXT_PUBLIC_URL，未设置时回退 http://localhost:3000。
+    回跳参数经既有 returnTo 消毒链路，登录或注册成功后落到 /teams。
+
+    Scenario: 已注册账号收到登录回跳链接
+      Given 环境设置 NEXT_PUBLIC_URL=https://tokens.example.com
+      And "Neon Ravens" 的 admin 邀请已注册账号 "mikoto"
+      When 系统发送邀请邮件
+      Then 邮件正文中的链接为 https://tokens.example.com/login?returnTo=%2Fteams
+
+    Scenario: 未注册邮箱收到注册回跳链接
+      Given 环境设置 NEXT_PUBLIC_URL=https://tokens.example.com
+      And admin 按邮箱地址邀请一个未注册地址
+      When 系统发送邀请邮件
+      Then 邮件正文中的链接为 https://tokens.example.com/register?returnTo=%2Fteams
+
+    Scenario: 未配置站点地址时回退本地默认
+      Given 环境未设置 NEXT_PUBLIC_URL
+      When 系统发送邀请邮件
+      Then 邮件正文中的链接以 http://localhost:3000 开头，路径和查询参数不变
+
+    Scenario: 登录成功后落到团队页
+      Given "mikoto" 从邀请邮件进入 /login?returnTo=%2Fteams
+      When "mikoto" 登录成功
+      Then 浏览器跳转到 /teams，邀请区可见
+
+    Scenario: 注册成功后落到团队页
+      Given 一个未注册邮箱持有 pending 邀请，邮件链接为 /register?returnTo=%2Fteams
+      When 该邮箱用此链接完成注册
+      Then 浏览器落到 /teams，邀请区可见
+      And 账号此时未验证邮箱，点「接受」时按「未验证邮箱时接受被阻断」场景被拦截
+
   Rule: 邮箱行与用户行指向同一个人时，保留创建时间较早的一条
 
     同一团队下理论上可能同时存在一条未关联用户的邮箱邀请，和一条指向该用户的用户邀请

@@ -324,6 +324,17 @@ export async function listMembers(teamId: string, viewerId: string | null) {
 
 type InviteInput = { username?: unknown; email?: unknown; groupId?: unknown };
 
+/**
+ * Invitation email link with the returnTo deep link back to /teams (D4).
+ * Host comes from NEXT_PUBLIC_URL with a localhost dev fallback; registered
+ * accounts get the login path, bare emails the register path.
+ */
+export function buildInviteLink(hasAccount: boolean): string {
+  const base = process.env.NEXT_PUBLIC_URL || "http://localhost:3000";
+  const path = hasAccount ? "/login" : "/register";
+  return `${base}${path}?returnTo=${encodeURIComponent("/teams")}`;
+}
+
 export async function inviteMembers(
   teamId: string,
   actorId: string,
@@ -335,7 +346,6 @@ export async function inviteMembers(
   }
   const created: { id: string; skipped?: boolean }[] = [];
   const details: string[] = [];
-  const baseUrl = process.env.NEXT_PUBLIC_URL || "http://localhost:3000";
 
   for (const item of items) {
     const username =
@@ -427,9 +437,7 @@ export async function inviteMembers(
       });
       created.push({ id: row.row.id });
       if (row.notifyEmail) {
-        const dest = row.row.invitedUserId
-          ? `${baseUrl}/login`
-          : `${baseUrl}/register`;
+        const dest = buildInviteLink(Boolean(row.row.invitedUserId));
         sendTeamInviteEmail(row.notifyEmail, team.name, dest);
       }
     } catch (err) {

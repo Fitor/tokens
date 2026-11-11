@@ -7,7 +7,7 @@ import { buttonVariants } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { getSession } from "@/lib/auth/session";
 import { LOCALE_COOKIE, parseLocale, t } from "@/lib/i18n";
-import { loadTeamsPageData } from "@/lib/teams/pageData";
+import { loadPendingInvitations, loadTeamsPageData } from "@/lib/teams/pageData";
 import { cn } from "@/lib/utils";
 import { TeamsClient } from "@/components/teams/TeamsClient";
 
@@ -51,10 +51,15 @@ export default async function TeamsPage() {
   }
 
   const initialData = await loadTeamsPageData(session.id);
+  const invitations = await loadPendingInvitations(session.id);
   return (
     <main className={cn(CONTAINER, "pb-24 pt-10 sm:pt-14")} id="main-content">
       <div className="mx-auto w-full max-w-[860px]">
-        <TeamsClient initialData={initialData} selfId={session.id} />
+        <TeamsClient
+          initialData={initialData}
+          selfId={session.id}
+          invitations={invitations}
+        />
       </div>
     </main>
   );

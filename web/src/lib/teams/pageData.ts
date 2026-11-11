@@ -1,5 +1,6 @@
 import { and, eq, inArray } from "drizzle-orm";
 import { db, groupMembers, groups, teamMembers, teams, users } from "@/lib/db";
+import { listMyInvitations } from "./service";
 import type { TeamMemberRole, TeamStatus, TeamVisibility } from "./types";
 
 export interface TeamsPageMember {
@@ -32,6 +33,35 @@ export interface TeamsPageData {
   isCreator: boolean;
   members: TeamsPageMember[];
   groups: TeamsPageGroup[];
+}
+
+export interface TeamsPageInvitation {
+  id: string;
+  teamName: string;
+  /** ISO timestamp of the invitation's expiry. */
+  expiresAt: string;
+}
+
+/**
+ * Pending, unexpired invitations addressed to the viewer — the /teams
+ * invitation inbox. `listMyInvitations` matches by user id and by bound
+ * email, so email-path invites reach the account before any backfill;
+ * expired rows are already filtered server-side.
+ */
+export async function loadPendingInvitations(
+  userId: string
+): Promise<TeamsPageInvitation[]> {
+  const rows = await db
+    .select({ email: users.email })
+    .from(users)
+    .where(eq(users.id, userId))
+    .limit(1);
+  const invitations = await listMyInvitations(userId, rows[0]?.email ?? null);
+  return invitations.map((row) => ({
+    id: row.id,
+    teamName: row.teamName,
+    expiresAt: row.expiresAt.toISOString(),
+  }));
 }
 
 /**

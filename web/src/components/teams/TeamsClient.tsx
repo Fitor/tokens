@@ -39,6 +39,7 @@ import type { TeamMemberRole, TeamStatus, TeamVisibility } from "@/lib/teams/typ
 import type {
   TeamsPageData,
   TeamsPageGroup,
+  TeamsPageInvitation,
   TeamsPageMember,
 } from "@/lib/teams/pageData";
 import { cn } from "@/lib/utils";
@@ -69,20 +70,94 @@ const TEAM_VIS_HINT_KEYS: Record<TeamVisibility, TranslationKey> = {
 export function TeamsClient({
   initialData,
   selfId,
+  invitations = [],
 }: {
   initialData: TeamsPageData | null;
   selfId: string;
+  invitations?: TeamsPageInvitation[];
 }) {
   const { t } = useI18n();
   return (
     <>
       <PageHeader title={t("teams.title")} description={t("teams.desc")} />
+      {invitations.length > 0 && <InviteInbox invitations={invitations} />}
       {initialData ? (
         <TeamDashboard data={initialData} selfId={selfId} />
       ) : (
         <CreateTeamCard />
       )}
     </>
+  );
+}
+
+/**
+ * 受邀人查看待处理邀请: one container at the top of TeamsClient with a row
+ * per pending invitation (D1), shown regardless of team membership. Accept
+ * is the only action (D3) — no decline control; expired invites never reach
+ * this component because the server filters them.
+ */
+function InviteInbox({ invitations }: { invitations: TeamsPageInvitation[] }) {
+  const { t } = useI18n();
+  return (
+    <Card className="mb-6" data-testid="invite-inbox">
+      <div className="flex items-center justify-between border-b border-border bg-muted/55 px-4 py-2.5">
+        <h2 className="text-sm font-semibold">{t("teams.invites.title")}</h2>
+        <Badge variant="outline" className="tabular">
+          {invitations.length}
+        </Badge>
+      </div>
+      <div className="flex flex-col divide-y divide-border">
+        {invitations.map((invite) => (
+          <InviteRow key={invite.id} invite={invite} />
+        ))}
+      </div>
+    </Card>
+  );
+}
+
+function InviteRow({ invite }: { invite: TeamsPageInvitation }) {
+  const { t, locale } = useI18n();
+  const router = useRouter();
+  const [busy, setBusy] = useState(false);
+  const expiryDate = new Date(invite.expiresAt).toLocaleDateString(
+    intlTag(locale)
+  );
+
+  /** Accept via the existing endpoint; failures toast the existing
+   *  locale-mapped server error (D5), success refreshes SSR data (D6). */
+  const accept = async () => {
+    setBusy(true);
+    const error = await teamApi(`/api/invitations/${invite.id}/accept`, {
+      method: "POST",
+    });
+    setBusy(false);
+    if (error) {
+      toast.error(error);
+      return;
+    }
+    router.refresh();
+  };
+
+  return (
+    <div className="flex flex-wrap items-center gap-2.5 px-4 py-2.5">
+      <div className="min-w-0">
+        <span className="block truncate text-sm font-medium">
+          {invite.teamName}
+        </span>
+        <span
+          className="block text-xs text-muted-foreground tabular"
+          data-testid="invite-expires"
+          data-expires={invite.expiresAt.slice(0, 10)}
+        >
+          {t("teams.invites.expires", { date: expiryDate })}
+        </span>
+      </div>
+      <div className="ml-auto">
+        <Button size="sm" disabled={busy} onClick={() => void accept()}>
+          {t("teams.invites.accept")}
+        </Button>
+      </div>
+    </div>
   );
 }
 
