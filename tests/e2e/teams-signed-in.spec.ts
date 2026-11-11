@@ -50,7 +50,7 @@ test("已登录 /teams: 创建团队(可见性必选) → 新建分组 → 邀�
     await createButton.click();
     await expect(page.getByText(teamName, { exact: true })).toBeVisible();
     await expect(page.getByText("active", { exact: true })).toBeVisible();
-    await expect(page.getByText("public", { exact: true })).toBeVisible();
+    await expect(page.getByText("Public", { exact: true })).toBeVisible();
     await expect(
       page.getByRole("button", { name: "Invite members" })
     ).toBeVisible();

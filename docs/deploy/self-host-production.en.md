@@ -39,7 +39,7 @@ TOKENS_API_URL=https://your-domain tokens submit
 | DB connection | `DATABASE_URL` only. Process-wide singleton pool (default `max=5`, `DATABASE_POOL_MAX` adjustable in 1..5). TLS is controlled by `DATABASE_SSL`; production default is `require` |
 | Daily maintenance | `POST /api/cron/refresh-social-links` (Bearer `CRON_SECRET`): refreshes social links, deletes expired email tokens, and runs `expireInvitations`, in that order. All success is 200; any failure is 500 (a scheduler retries non-2xx; the jobs are idempotent) |
 | Login/register limit | In-process fixed window, 10 requests / 60s / IP (`lib/auth/rateLimit.ts`). The proxy must overwrite `X-Forwarded-For`. Multiple instances need shared storage |
-| Mail | Resend plus `RESEND_API_KEY` / `EMAIL_FROM`. Unconfigured mail is log-only |
+| Mail | Configure `SMTP_HOST` or `RESEND_API_KEY`, and set `EMAIL_FROM`. SMTP takes priority. Unconfigured mail is log-only |
 | Cache | Next's default cache handler (`.next/cache` plus memory). No edge HTML cache. OG and embed render from origin every time |
 
 ## Team availability
@@ -47,7 +47,7 @@ TOKENS_API_URL=https://your-domain tokens submit
 | Capability | Condition |
 |---|---|
 | Create team / roles / username invite / Teamboard / Team·Group columns | Database at 0027 and the web process up |
-| Email invites actually send | Needs `RESEND_API_KEY` and `EMAIL_FROM`. Otherwise the invite is stored and the recipient gets nothing |
+| Email invites actually send | Needs SMTP or Resend and `EMAIL_FROM`. Otherwise the invite is stored and the recipient gets nothing |
 | Accepting an email invite | Requires the invitee's `emailVerifiedAt`. Without a verification mail this returns 403 |
 | Invite expiry | A system cron must call the maintenance endpoint above |
 
@@ -69,7 +69,7 @@ TOKENS_API_URL=https://your-domain tokens submit
 
 1. Install Postgres 16 on the server, create the database and role. Do not reuse the Compose `tokens/tokens` password.
 2. Migrate this repo's schema to 0027. **On the production database run only `DATABASE_URL=… bun run db:migrate` (`drizzle-kit migrate`).** Do not run `bun run test:migrations` against the cloud database. That runs `scripts/check-migrations.ts`, which inserts replay rows inside a transaction. It rolls back, but it takes locks and runs assertions. It is a checker, not a migrator. Run `test:migrations` only against local Compose or a throwaway database.
-3. Put HTTPS in front. Set `NODE_ENV=production`, `NEXT_PUBLIC_URL=https://your-domain`, `DATABASE_URL=…`, `DATABASE_SSL` to match the real TLS setup (`disable` if there is no TLS), and `CRON_SECRET` (a long random string). The proxy must overwrite `X-Forwarded-For`. Optional: `CONTACT_EMAIL` (legal-page contact; if unset, legal pages show the site link and do not render a mailto), and `RESEND_API_KEY` / `EMAIL_FROM` (verification and invite mail).
+3. Put HTTPS in front. Set `NODE_ENV=production`, `NEXT_PUBLIC_URL=https://your-domain`, `DATABASE_URL=…`, `DATABASE_SSL` to match the real TLS setup (`disable` if there is no TLS), and `CRON_SECRET` (a long random string). The proxy must overwrite `X-Forwarded-For`. Optional: `CONTACT_EMAIL` (legal-page contact; if unset, legal pages show the site link and do not render a mailto), and SMTP or `RESEND_API_KEY`, and `EMAIL_FROM` (verification and invite mail).
 4. `next build && next start`, or the compose stack in `docs/deploy/docker/prod/` (`up -d --build`, then `bun run --cwd web db:migrate` inside the web container). The runbook in that directory is Chinese.
 5. System cron on the same host, loopback only: `curl -fsS -X POST http://127.0.0.1:3000/api/cron/refresh-social-links -H "Authorization: Bearer $CRON_SECRET"`. Alert or retry on non-2xx.
 6. External acceptance, below.
@@ -78,7 +78,7 @@ TOKENS_API_URL=https://your-domain tokens submit
 
 - [ ] `TOKENS_API_URL=https://domain tokens login` prints an `https://domain/device` link and a user code. After the browser submits the code, the CLI holds a `tt_` token from this database.
 - [ ] `TOKENS_API_URL=https://domain tokens submit` succeeds, and this site's Leaderboard shows that user's usage. If login and submit share a shell, export the variable for the whole shell. CLI credentials do not store the API base.
-- [ ] An unverified user invited by email is rejected on accept (403). After verification, accept succeeds (this needs Resend).
+- [ ] An unverified user invited by email is rejected on accept (403). After verification, accept succeeds (this needs SMTP or Resend).
 - [ ] Username invite works end to end: create team, invite, accept, pick the person on Teamboard, and the board columns show Team/Group.
 - [ ] The scheduled job marks an expired invite expired (cron returns 200 and `expiredInvitations` counts correctly).
 - [ ] A `tokens.ci` user who submits without logout gets 401 from this site. That confirms rejection, not accidental ingestion of upstream data.
@@ -87,3 +87,7 @@ TOKENS_API_URL=https://your-domain tokens submit
 ## Not a deploy task (known gap)
 
 1. **CLI endpoint profile / `TOKENS_CONFIG_DIR` dual-site setup**: allow tokens.ci and this site to be used together. Today there is one credential store and one API base.
+
+### SMTP mail
+
+Set `SMTP_HOST`, `SMTP_PORT`, `SMTP_SECURE`, and `EMAIL_FROM`. For authentication, set both `SMTP_USER` and `SMTP_PASS`. QQ Mail uses `smtp.qq.com` on port 465. Its `SMTP_PASS` is an authorization code, not the login password. QQ Mail rejects messages when `EMAIL_FROM` differs from `SMTP_USER`. Port 465 requires `SMTP_SECURE=true`. With `SMTP_SECURE=false`, credentials travel in plaintext if the server does not offer STARTTLS. Run `nc -z smtp.qq.com 465` to check outbound access. Personal QQ accounts have a daily sending limit.

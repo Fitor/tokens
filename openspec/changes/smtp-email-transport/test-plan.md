@@ -6,23 +6,23 @@
 
 | Requirement | Scenario | Test File | Test Name | Initial State |
 |-------------|----------|-----------|-----------|---------------|
-| specs/email-transport/spec.md → 传输层按环境变量优先级选择 | 只配置 SMTP_HOST 时选择 SMTP 传输层 | web/src/lib/email/send.test.ts | selection: smtp host alone selects smtp transport | 🔴 red |
-| specs/email-transport/spec.md → 传输层按环境变量优先级选择 | 两者都配置时选择 SMTP | web/src/lib/email/send.test.ts | selection: both configured prefers smtp | 🔴 red |
-| specs/email-transport/spec.md → 传输层按环境变量优先级选择 | 只配置 RESEND_API_KEY 时选择 Resend | web/src/lib/email/send.test.ts | selection: resend key alone selects resend | 🔴 red |
-| specs/email-transport/spec.md → 传输层按环境变量优先级选择 | 空字符串 SMTP_HOST 视为未配置 | web/src/lib/email/send.test.ts | selection: empty smtp host treated as unset | 🔴 red |
-| specs/email-transport/spec.md → 传输层按环境变量优先级选择 | 两者都未配置时跳过发送 | web/src/lib/email/send.test.ts | selection: nothing configured skips send with log | 🔴 red |
-| specs/email-transport/spec.md → 传输层按环境变量优先级选择 | 非法端口回退默认值 | web/src/lib/email/send.test.ts | selection: invalid port falls back to 587 | 🔴 red |
-| specs/email-transport/spec.md → 传输层按环境变量优先级选择 | 部署文档包含端口配对与明文警示 | web/src/lib/email/send.test.ts | docs: port pairing and plaintext warnings present | 🔴 red |
-| specs/email-transport/spec.md → SMTP 传输层完成发送且失败不外溢 | SMTP 正常路径发送预期信封 | web/src/lib/email/send.test.ts | smtp: happy path sends expected envelope | 🔴 red |
-| specs/email-transport/spec.md → SMTP 传输层完成发送且失败不外溢 | SMTP 失败不外溢 | web/src/lib/email/send.test.ts | smtp: failure contained and logged | 🔴 red |
-| specs/email-transport/spec.md → SMTP 传输层完成发送且失败不外溢 | 缺少 EMAIL_FROM 时跳过 SMTP 发送 | web/src/lib/email/send.test.ts | smtp: missing EMAIL_FROM skips send | 🔴 red |
-| specs/email-transport/spec.md → 主题清洗在发送入口统一执行 | SMTP 路径主题 CRLF 替换为空格 | web/src/lib/email/send.test.ts | sanitize: smtp path replaces crlf with spaces | 🔴 red |
-| specs/email-transport/spec.md → 主题清洗在发送入口统一执行 | Resend 路径主题 CRLF 替换为空格 | web/src/lib/email/send.test.ts | sanitize: resend path replaces crlf with spaces | 🔴 red |
-| specs/email-transport/spec.md → 主题清洗在发送入口统一执行 | 不含 CRLF 的主题逐字不变 | web/src/lib/email/send.test.ts | sanitize: subject without crlf unchanged | 🔴 red |
-| specs/email-transport/spec.md → 主题清洗在发送入口统一执行 | 跳过日志同样得到清洗后的主题 | web/src/lib/email/send.test.ts | sanitize: skip log uses sanitized subject | 🔴 red |
-| specs/email-transport/spec.md → Resend 传输层行为保持不变 | Resend 正常路径发送既有载荷 | web/src/lib/email/send.test.ts | resend: happy path posts existing payload | 🔴 red |
-| specs/email-transport/spec.md → Resend 传输层行为保持不变 | Resend 拒绝不外溢 | web/src/lib/email/send.test.ts | resend: rejection contained and logged | 🔴 red |
-| specs/email-transport/spec.md → Resend 传输层行为保持不变 | Resend 网络层失败不外溢 | web/src/lib/email/send.test.ts | resend: network failure contained and logged | 🔴 red |
+| specs/email-transport/spec.md → 传输层按环境变量优先级选择 | 只配置 SMTP_HOST 时选择 SMTP 传输层 | web/src/lib/email/send.test.ts | selection: smtp host alone selects smtp transport | 🟢 green |
+| specs/email-transport/spec.md → 传输层按环境变量优先级选择 | 两者都配置时选择 SMTP | web/src/lib/email/send.test.ts | selection: both configured prefers smtp | 🟢 green |
+| specs/email-transport/spec.md → 传输层按环境变量优先级选择 | 只配置 RESEND_API_KEY 时选择 Resend | web/src/lib/email/send.test.ts | selection: resend key alone selects resend | 🟢 green |
+| specs/email-transport/spec.md → 传输层按环境变量优先级选择 | 空字符串 SMTP_HOST 视为未配置 | web/src/lib/email/send.test.ts | selection: empty smtp host treated as unset | 🟢 green |
+| specs/email-transport/spec.md → 传输层按环境变量优先级选择 | 两者都未配置时跳过发送 | web/src/lib/email/send.test.ts | selection: nothing configured skips send with log | 🟢 green |
+| specs/email-transport/spec.md → 传输层按环境变量优先级选择 | 非法端口回退默认值 | web/src/lib/email/send.test.ts | selection: invalid port falls back to 587 | 🟢 green |
+| specs/email-transport/spec.md → 传输层按环境变量优先级选择 | 部署文档包含端口配对与明文警示 | web/src/lib/email/send.test.ts | docs: port pairing and plaintext warnings present | 🟢 green |
+| specs/email-transport/spec.md → SMTP 传输层完成发送且失败不外溢 | SMTP 正常路径发送预期信封 | web/src/lib/email/send.test.ts | smtp: happy path sends expected envelope | 🟢 green |
+| specs/email-transport/spec.md → SMTP 传输层完成发送且失败不外溢 | SMTP 失败不外溢 | web/src/lib/email/send.test.ts | smtp: failure contained and logged | 🟢 green |
+| specs/email-transport/spec.md → SMTP 传输层完成发送且失败不外溢 | 缺少 EMAIL_FROM 时跳过 SMTP 发送 | web/src/lib/email/send.test.ts | smtp: missing EMAIL_FROM skips send | 🟢 green |
+| specs/email-transport/spec.md → 主题清洗在发送入口统一执行 | SMTP 路径主题 CRLF 替换为空格 | web/src/lib/email/send.test.ts | sanitize: smtp path replaces crlf with spaces | 🟢 green |
+| specs/email-transport/spec.md → 主题清洗在发送入口统一执行 | Resend 路径主题 CRLF 替换为空格 | web/src/lib/email/send.test.ts | sanitize: resend path replaces crlf with spaces | 🟢 green |
+| specs/email-transport/spec.md → 主题清洗在发送入口统一执行 | 不含 CRLF 的主题逐字不变 | web/src/lib/email/send.test.ts | sanitize: subject without crlf unchanged | 🟢 green |
+| specs/email-transport/spec.md → 主题清洗在发送入口统一执行 | 跳过日志同样得到清洗后的主题 | web/src/lib/email/send.test.ts | sanitize: skip log uses sanitized subject | 🟢 green |
+| specs/email-transport/spec.md → Resend 传输层行为保持不变 | Resend 正常路径发送既有载荷 | web/src/lib/email/send.test.ts | resend: happy path posts existing payload | 🟢 green |
+| specs/email-transport/spec.md → Resend 传输层行为保持不变 | Resend 拒绝不外溢 | web/src/lib/email/send.test.ts | resend: rejection contained and logged | 🟢 green |
+| specs/email-transport/spec.md → Resend 传输层行为保持不变 | Resend 网络层失败不外溢 | web/src/lib/email/send.test.ts | resend: network failure contained and logged | 🟢 green |
 
 ## Coverage Notes
 

@@ -9,25 +9,19 @@
     "lint": "eslint",
     "test:e2e": "playwright test",
     "typecheck": "tsc --noEmit",
-
     "test:migrations": "drizzle-kit migrate && bun scripts/check-migrations.ts",
     "test:teams": "bun scripts/check-teams-invariants.ts",
     "test:private": "bun scripts/check-private-mode.ts",
-
-
-
     "gallery": "bun scripts/gallery/build-gallery.ts",
     "generate:embed-logos": "bun scripts/generate-embed-logos.ts",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "drizzle-kit migrate",
     "db:push": "drizzle-kit push",
     "db:studio": "drizzle-kit studio"
-
   },
   "dependencies": {
     "@base-ui/react": "^1.6.0",
     "@lobehub/icons-static-svg": "^1.94.0",
-
     "@radix-ui/react-tooltip": "^1.2.8",
     "@tailwindcss/postcss": "^4.3.0",
     "@upstash/ratelimit": "^2.2.0",
@@ -40,6 +34,7 @@
     "next": "16.0.10",
     "next-themes": "^0.4.6",
     "nextjs-toploader": "^3.9.17",
+    "nodemailer": "^10.5.0",
     "obelisk.js": "^1.2.2",
     "postgres": "^3.4.7",
     "react": "19.2.0",
@@ -54,6 +49,7 @@
   "devDependencies": {
     "@playwright/test": "^1.63.0",
     "@types/node": "^20",
+    "@types/nodemailer": "^8.0.2",
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "bun-types": "^1.3.14",
@@ -61,6 +57,5 @@
     "eslint": "^9",
     "eslint-config-next": "16.0.6",
     "typescript": "^5"
-
   }
 }

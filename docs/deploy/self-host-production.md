@@ -39,7 +39,7 @@ TOKENS_API_URL=https://你的域名 tokens submit
 | DB 连接 | 仅 `DATABASE_URL`，进程级单例池（默认 `max=5`，`DATABASE_POOL_MAX` 1..5 可调）；TLS 由 `DATABASE_SSL` 控制，生产默认 `require` |
 | 每日维护 | `POST /api/cron/refresh-social-links`（Bearer `CRON_SECRET`）：同步执行社交链接刷新 + 过期邮件 token 清理 + `expireInvitations`；全成功 200，任一失败 500（调度器按非 2xx 重试；任务均幂等） |
 | 登录/注册限流 | 进程内固定窗口 10 次/60s/IP（`lib/auth/rateLimit.ts`）；反代必须覆写 `X-Forwarded-For`；多实例需共享存储 |
-| 邮件 | Resend + `RESEND_API_KEY`/`EMAIL_FROM`；未配置则只打日志 |
+| 邮件 | 配置 `SMTP_HOST` 或 `RESEND_API_KEY`，并设置 `EMAIL_FROM`。SMTP 优先；均未配置时只记录日志 |
 | 缓存 | Next 默认 cache handler（`.next/cache` + 内存）；无边缘 HTML 缓存，OG/embed 每次回源渲染 |
 
 ## Team 可用性分级
@@ -47,7 +47,7 @@ TOKENS_API_URL=https://你的域名 tokens submit
 | 能力 | 条件 |
 |---|---|
 | 建团 / 角色 / 用户名邀请 / Teamboard / 榜上 Team·Group 列 | 库迁到 0027 + Web 起来即可 |
-| 邮件邀请发信 | 需 `RESEND_API_KEY` + `EMAIL_FROM`；否则邀请落库但对方收不到 |
+| 邮件邀请发信 | 需 SMTP 或 Resend，以及 `EMAIL_FROM`；否则邀请落库但对方收不到 |
 | 按邮箱邀请的接受 | 要求被邀请人 `emailVerifiedAt`，没验证信会 403 |
 | 邀请过期 | 挂系统 cron 调维护端点（见上） |
 
@@ -69,7 +69,7 @@ TOKENS_API_URL=https://你的域名 tokens submit
 
 1. 云服务器装 Postgres 16，建库建号；不要用 Compose 的 `tokens/tokens` 口令。
 2. 跑本仓迁移到 0027：**生产库只执行 `DATABASE_URL=… bun run db:migrate`（`drizzle-kit migrate`）**。不要对云上库跑 `bun run test:migrations`——它会执行 `scripts/check-migrations.ts`（在事务里插入回放数据，虽 ROLLBACK，但会拿锁、跑断言，是验证工具不是迁移工具）。`test:migrations` 只对本地 Compose 或一次性隔离验证库执行。
-3. 反代 HTTPS；环境：`NODE_ENV=production`、`NEXT_PUBLIC_URL=https://你的域名`、`DATABASE_URL=…`、`DATABASE_SSL` 按 TLS 实配（无 TLS 用 `disable`）、`CRON_SECRET`（随机长串）。反代必须覆写 `X-Forwarded-For`。可选：`CONTACT_EMAIL`（法律页联系邮箱；未配置则法律页只显示站点链接，不渲染 mailto）、`RESEND_API_KEY`/`EMAIL_FROM`（验证与邀请邮件）。
+3. 反代 HTTPS；环境：`NODE_ENV=production`、`NEXT_PUBLIC_URL=https://你的域名`、`DATABASE_URL=…`、`DATABASE_SSL` 按 TLS 实配（无 TLS 用 `disable`）、`CRON_SECRET`（随机长串）。反代必须覆写 `X-Forwarded-For`。可选：`CONTACT_EMAIL`（法律页联系邮箱；未配置则法律页只显示站点链接，不渲染 mailto）、SMTP 或 `RESEND_API_KEY`，以及 `EMAIL_FROM`（验证与邀请邮件）。
 4. `next build && next start`，或用 `docs/deploy/docker/prod/` 的 compose 栈（`up -d --build` 后在 web 容器内 `bun run --cwd web db:migrate` 跑迁移，runbook 见该目录 README）。
 5. 系统 cron（同机 loopback）：`curl -fsS -X POST http://127.0.0.1:3000/api/cron/refresh-social-links -H "Authorization: Bearer $CRON_SECRET"`，非 2xx 时告警/重试。
 6. 端到端验收（见下）。
@@ -88,3 +88,7 @@ TOKENS_API_URL=https://你的域名 tokens submit
 ## 待开发项（不属于部署，属于缺口）
 
 1. **CLI endpoint profile / `TOKENS_CONFIG_DIR` 双站方案**：允许 tokens.ci 与自建站并存。目前是单凭据单基址。
+
+### SMTP 邮件
+
+配置 `SMTP_HOST`、`SMTP_PORT`、`SMTP_SECURE` 和 `EMAIL_FROM`。需要认证时，同时配置 `SMTP_USER` 与 `SMTP_PASS`。QQ 邮箱使用 `smtp.qq.com` 和 465 端口；`SMTP_PASS` 是授权码，不是登录密码。QQ 邮箱会拒收 `EMAIL_FROM` 与 `SMTP_USER` 不一致的邮件。465 端口必须设置 `SMTP_SECURE=true`。`SMTP_SECURE=false` 且服务器不提供 STARTTLS 时，凭据会明文传输。运行 `nc -z smtp.qq.com 465` 检查出网。个人 QQ 账号有每日发信限额。

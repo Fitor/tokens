@@ -11,24 +11,66 @@
  */
 const RESEND_API_URL = "https://api.resend.com/emails";
 
-async function sendEmail(to: string, subject: string, text: string): Promise<void> {
-  const apiKey = process.env.RESEND_API_KEY;
+type EmailTransport =
+  | { type: "smtp"; host: string; port: number; secure: boolean; auth?: { user: string; pass: string } }
+  | { type: "resend"; apiKey: string }
+  | { type: "skip" };
+
+export function resolveEmailTransport(env: Record<string, string | undefined>): EmailTransport {
+  if (env.SMTP_HOST) {
+    const parsedPort = Number(env.SMTP_PORT);
+    const port = Number.isInteger(parsedPort) && parsedPort >= 1 && parsedPort <= 65535 ? parsedPort : 587;
+    const auth = env.SMTP_USER && env.SMTP_PASS ? { user: env.SMTP_USER, pass: env.SMTP_PASS } : undefined;
+    return { type: "smtp", host: env.SMTP_HOST, port, secure: env.SMTP_SECURE?.toLowerCase() === "true", ...(auth ? { auth } : {}) };
+  }
+  return env.RESEND_API_KEY ? { type: "resend", apiKey: env.RESEND_API_KEY } : { type: "skip" };
+}
+
+let cachedKey: string | undefined;
+let cachedTransport: EmailTransport;
+let smtpTransport: Promise<import("nodemailer").Transporter> | undefined;
+
+function getTransport(): EmailTransport {
+  const env = process.env;
+  const key = JSON.stringify([env.SMTP_HOST, env.SMTP_PORT, env.SMTP_SECURE, env.SMTP_USER, env.SMTP_PASS, env.RESEND_API_KEY]);
+  if (key !== cachedKey) {
+    cachedKey = key;
+    smtpTransport = undefined;
+    cachedTransport = resolveEmailTransport(env);
+  }
+  return cachedTransport;
+}
+
+export async function sendEmail(to: string, subject: string, text: string): Promise<void> {
+  subject = subject.replace(/[\r\n]/g, " ");
+  const transport = getTransport();
   const from = process.env.EMAIL_FROM;
-  if (!apiKey || !from) {
-    console.error(`[email] RESEND_API_KEY/EMAIL_FROM not configured; skipped "${subject}" to ${to}`);
+  if (transport.type === "skip" || !from) {
+    console.error(`[email] SMTP_HOST/RESEND_API_KEY/EMAIL_FROM not configured; skipped "${subject}" to ${to}`);
     return;
   }
-
-  const response = await fetch(RESEND_API_URL, {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${apiKey}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({ from, to: [to], subject, text }),
-  });
-  if (!response.ok) {
-    console.error(`[email] Resend rejected "${subject}" to ${to}: ${response.status}`);
+  if (transport.type === "smtp") {
+    try {
+      smtpTransport ??= import("nodemailer").then(({ default: nodemailer }) => nodemailer.createTransport({
+        host: transport.host, port: transport.port, secure: transport.secure,
+        ...(transport.auth ? { auth: transport.auth } : {}),
+        connectionTimeout: 10_000, greetingTimeout: 10_000, socketTimeout: 20_000,
+      }));
+      await (await smtpTransport).sendMail({ from, to, subject, text });
+    } catch (error) {
+      console.error("[email] SMTP send failed", error);
+    }
+    return;
+  }
+  try {
+    const response = await fetch(RESEND_API_URL, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${transport.apiKey}`, "Content-Type": "application/json" },
+      body: JSON.stringify({ from, to: [to], subject, text }),
+    });
+    if (!response.ok) console.error(`[email] Resend rejected "${subject}" to ${to}: ${response.status}`);
+  } catch (error) {
+    console.error("[email] send failed", error);
   }
 }
 
