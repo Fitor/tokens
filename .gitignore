@@ -162,3 +162,7 @@ tests/e2e/**/*.trace.zip
 
 # Onboard backup-then-overwrite: AGENTS.md.YYYY-MM-DD-N beside the live file
 /AGENTS.md.*
+
+# Editor swap/backup files
+*.swp
+*~
