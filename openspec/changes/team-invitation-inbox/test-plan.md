@@ -4,20 +4,20 @@
 
 | Requirement | Scenario | Test File | Test Name | Initial State |
 |-------------|----------|-----------|-----------|---------------|
-| specs/team-invitation-inbox/spec.md → 受邀人查看待处理邀请 | 有待处理邀请时显示邀请区 | tests/e2e/team-invitation-inbox.spec.ts | `inbox: pending invite renders card with ISO expiry` | 🔴 red |
-| specs/team-invitation-inbox/spec.md → 受邀人查看待处理邀请 | 已在团队时邀请区仍显示 | tests/e2e/team-invitation-inbox.spec.ts | `inbox: card renders alongside existing team dashboard` | 🔴 red |
-| specs/team-invitation-inbox/spec.md → 受邀人查看待处理邀请 | 过期邀请不渲染 | tests/e2e/team-invitation-inbox.spec.ts | `inbox: expired invitation is not rendered` | 🔴 red |
-| specs/team-invitation-inbox/spec.md → 受邀人接受邀请 | 接受成功入团 | tests/e2e/team-invitation-inbox.spec.ts | `accept: success joins team and card disappears` | 🔴 red |
-| specs/team-invitation-inbox/spec.md → 受邀人接受邀请 | 多条邀请时接受其一 | tests/e2e/team-invitation-inbox.spec.ts | `accept: accepting one invitation keeps the other card` | 🔴 red |
-| specs/team-invitation-inbox/spec.md → 受邀人接受邀请 | 已在团队时接受被阻断 | tests/e2e/team-invitation-inbox.spec.ts | `accept: blocked when already in a team (409 toast)` | 🔴 red |
-| specs/team-invitation-inbox/spec.md → 受邀人接受邀请 | 未验证邮箱时接受被阻断 | tests/e2e/team-invitation-inbox.spec.ts | `accept: blocked for unverified email invitee (403 toast)` | 🔴 red |
-| specs/team-invitation-inbox/spec.md → 受邀人接受邀请 | 页面停留期间邀请过期 | tests/e2e/team-invitation-inbox.spec.ts | `accept: invitation expiring after render shows expired toast` | 🔴 red |
-| specs/team-invitation-inbox/spec.md → 受邀人接受邀请 | 目标团队已解散时接受被阻断 | tests/e2e/team-invitation-inbox.spec.ts | `accept: disbanded team invitation shows notActive toast` | 🔴 red |
-| specs/team-invitation-inbox/spec.md → 邀请邮件链接携带回跳参数 | 已注册账号收到登录回跳链接 | web/src/lib/teams/inviteLink.test.ts | `invite link: registered account -> /login?returnTo=%2Fteams` | 🔴 red |
-| specs/team-invitation-inbox/spec.md → 邀请邮件链接携带回跳参数 | 未注册邮箱收到注册回跳链接 | web/src/lib/teams/inviteLink.test.ts | `invite link: unregistered email -> /register?returnTo=%2Fteams` | 🔴 red |
-| specs/team-invitation-inbox/spec.md → 邀请邮件链接携带回跳参数 | 未配置站点地址时回退本地默认 | web/src/lib/teams/inviteLink.test.ts | `invite link: NEXT_PUBLIC_URL fallback keeps path and query` | 🔴 red |
-| specs/team-invitation-inbox/spec.md → 邀请邮件链接携带回跳参数 | 登录成功后落到团队页 | tests/e2e/team-invitation-inbox.spec.ts | `deep link: login with returnTo=%2Fteams lands on /teams` | 🔴 red |
-| specs/team-invitation-inbox/spec.md → 邀请邮件链接携带回跳参数 | 注册成功后落到团队页 | tests/e2e/team-invitation-inbox.spec.ts | `deep link: register with returnTo=%2Fteams lands on /teams` | 🔴 red |
+| specs/team-invitation-inbox/spec.md → 受邀人查看待处理邀请 | 有待处理邀请时显示邀请区 | tests/e2e/team-invitation-inbox.spec.ts | `inbox: pending invite renders card with ISO expiry` | 🟢 green |
+| specs/team-invitation-inbox/spec.md → 受邀人查看待处理邀请 | 已在团队时邀请区仍显示 | tests/e2e/team-invitation-inbox.spec.ts | `inbox: card renders alongside existing team dashboard` | 🟢 green |
+| specs/team-invitation-inbox/spec.md → 受邀人查看待处理邀请 | 过期邀请不渲染 | tests/e2e/team-invitation-inbox.spec.ts | `inbox: expired invitation is not rendered` | 🟢 green |
+| specs/team-invitation-inbox/spec.md → 受邀人接受邀请 | 接受成功入团 | tests/e2e/team-invitation-inbox.spec.ts | `accept: success joins team and card disappears` | 🟢 green |
+| specs/team-invitation-inbox/spec.md → 受邀人接受邀请 | 多条邀请时接受其一 | tests/e2e/team-invitation-inbox.spec.ts | `accept: accepting one invitation keeps the other card` | 🟢 green |
+| specs/team-invitation-inbox/spec.md → 受邀人接受邀请 | 已在团队时接受被阻断 | tests/e2e/team-invitation-inbox.spec.ts | `accept: blocked when already in a team (409 toast)` | 🟢 green |
+| specs/team-invitation-inbox/spec.md → 受邀人接受邀请 | 未验证邮箱时接受被阻断 | tests/e2e/team-invitation-inbox.spec.ts | `accept: blocked for unverified email invitee (403 toast)` | 🟢 green |
+| specs/team-invitation-inbox/spec.md → 受邀人接受邀请 | 页面停留期间邀请过期 | tests/e2e/team-invitation-inbox.spec.ts | `accept: invitation expiring after render shows expired toast` | 🟢 green |
+| specs/team-invitation-inbox/spec.md → 受邀人接受邀请 | 目标团队已解散时接受被阻断 | tests/e2e/team-invitation-inbox.spec.ts | `accept: disbanded team invitation shows notActive toast` | 🟢 green |
+| specs/team-invitation-inbox/spec.md → 邀请邮件链接携带回跳参数 | 已注册账号收到登录回跳链接 | web/src/lib/teams/inviteLink.test.ts | `invite link: registered account -> /login?returnTo=%2Fteams` | 🟢 green |
+| specs/team-invitation-inbox/spec.md → 邀请邮件链接携带回跳参数 | 未注册邮箱收到注册回跳链接 | web/src/lib/teams/inviteLink.test.ts | `invite link: unregistered email -> /register?returnTo=%2Fteams` | 🟢 green |
+| specs/team-invitation-inbox/spec.md → 邀请邮件链接携带回跳参数 | 未配置站点地址时回退本地默认 | web/src/lib/teams/inviteLink.test.ts | `invite link: NEXT_PUBLIC_URL fallback keeps path and query` | 🟢 green |
+| specs/team-invitation-inbox/spec.md → 邀请邮件链接携带回跳参数 | 登录成功后落到团队页 | tests/e2e/team-invitation-inbox.spec.ts | `deep link: login with returnTo=%2Fteams lands on /teams` | 🟢 green |
+| specs/team-invitation-inbox/spec.md → 邀请邮件链接携带回跳参数 | 注册成功后落到团队页 | tests/e2e/team-invitation-inbox.spec.ts | `deep link: register with returnTo=%2Fteams lands on /teams` | 🟢 green |
 
 ## Coverage Notes
 
