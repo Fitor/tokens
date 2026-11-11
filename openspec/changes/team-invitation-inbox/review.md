@@ -1,52 +1,46 @@
 ## Review Metadata
-- **Review round**: 1
-- **Prior round**: none
-- **Reviewer context**: fresh-context subagent（同模型本地评审；本机存在 codex CLI，但未确认该代码库允许外发数据，按数据本地性原则留本地）
-- **Tool restrictions**: 只读检查 + 仅写 review.md
-- **Artifacts reviewed**: proposal.md, design.md, specs/, openspec/config.yaml, 相关源码
+- **Review round**: 2
+- **Prior round**: 第 1 轮 APPROVE_WITH_CHANGES（RC1–RC5），已应用并复核接受，CHANGES_APPLIED: yes
+- **Reviewer context**: fresh-context subagent（GLM 5.3，用户指定的第二轮评审）
+- **Tool restrictions**: 只读检查 + 仅覆盖写 review.md
+- **Artifacts reviewed**: proposal.md, design.md, specs/, test-plan.md, tasks.md, openspec/config.yaml, 相关源码
 
 ## Findings
 
 ### 🔴 Critical (blocking)
 
-无。核心方向正确：后端能力确实齐备，改动纯增量，无 schema/API 变更，安全面未引入新路径。
+无。核心结论维持：改动纯增量，无 schema/API 变更；accept/decline 复用既有端点，会话与归属校验不被削弱（`requireCookieSession` + `assertInvitee`，`web/src/app/api/invitations/[id]/accept/route.ts`）；`returnTo` 链路经 `sanitizeAuthReturnTo` 消毒，本 change 只注入固定常量 `%2Fteams`，无开放重定向。RC1–RC5 修订逐项对照源码复核属实：design D4 现与 `returnTo.ts` + `login/page.tsx:14-19` 的实际解码链路一致；Requirement 2 已消除与 Requirement 1 的卡片消失冲突并新增多条邀请场景；场景 1.1 钉到 `data-testid`/`data-expires`；补齐过期后点击与解散团队两个失败场景；补齐注册落地场景。本轮新问题集中在第 1 轮未评审的 test-plan.md 与 tasks.md，均为测试设计缺陷，不触及产品行为。
 
 ### 🟡 Moderate
 
-**M1 design.md D4 对 `sanitizeAuthReturnTo` 的机制描述错误，按现文写测试会失败。**
-D4 写「`sanitizeAuthReturnTo` 已放行 `%2Fteams`」。直接以 `"%2Fteams"` 调用该函数会命中 `hasUnsafeRelativeStart(raw)`（raw 不以 `/` 开头，`web/src/lib/auth/returnTo.ts:4-6,28`），返回默认值 `/leaderboard`，并不放行。实际放行链路是：Next.js 把 `searchParams` 解码后传给登录页（`web/src/app/login/page.tsx:15-18`），sanitize 收到的已是 `/teams`。结论（邮件链接登录后落到 `/teams`）成立，但归因错误。design Risks 要求「对 `%2Fteams` 的放行路径补 e2e 断言」——若实现者据此对函数本体写单元断言，测试必失败。见 RC1。
+**N1 场景 1.1 的固定到期断言三天内腐化，tasks 2.1 的 fixture 配方产生不了该断言值。**
+spec 场景 1.1 断言 `data-expires="2026-11-14"`，GIVEN 固定 `expiresAt=2026-11-14T00:00:00Z`。今天是 2026-11-11。API 邀请固定写 `expiresAt = now + 7 天`（`INVITE_TTL_MS`，`web/src/lib/teams/service.ts:18,422`）。按 tasks 2.1 的配方（建号、API 建团、API 邀请，无回填）跑出的值是运行日加 7 天，永远不等于 `2026-11-14`；要命中字面断言只能 DB 回填到该固定日期，而回填值自 2026-11-14 起成为过去，`listMyInvitations` 的 `expiresAt > now()` 过滤使卡片不再渲染，该用例永久红。另外 tasks 2.2 的实现清单未列 `data-testid="invite-expires"` 与 `data-expires` 属性，而它们是 RC3 修复与 test-plan「到期断言与 locale 解耦」的唯一锚点。见 RC1。
 
-**M2 Requirement 2「邀请卡片消失」与 Requirement 1 冲突（多条邀请场景）。**
-Requirement 1 要求展示「全部 `pending` 且未过期的邀请」。同一用户可同时持有多个团队的 pending 邀请（`linkPendingInvitationsForEmail` 仅在同团队内去重置 superseded，`web/src/lib/teams/service.ts:1022-1061`；`inviteMembers` 不阻止跨团队重复邀请）。此时接受其中一条后：Requirement 1 要求另一条仍展示，Requirement 2 却无条件要求「邀请卡片消失」。两条规范不可同时满足。`team_members_user_unique`（`web/src/lib/db/schema.ts:584`）使第二点的接受必然 409，展示与接受两条路径都用户可达。见 RC2。
+**N2 Req3 的测试映射夸大覆盖：回退分支不可达，调用点接线无断言。**
+test-plan 称场景 3.1–3.3 的邮件正文内容由纯函数单测覆盖。回退逻辑 `process.env.NEXT_PUBLIC_URL || "http://localhost:3000"` 位于 `inviteMembers`（`service.ts:338`），不在 `buildInviteLink(baseUrl, hasAccount)` 签名内；用例 `invite link: NEXT_PUBLIC_URL fallback keeps path and query` 以显式 `baseUrl` 调用纯函数，无法触达场景 3.3 要求的「环境未设置 NEXT_PUBLIC_URL」分支。同时 `service.ts:430-433` 两处调用点是否改用 `buildInviteLink` 无任何自动化断言——实现者新增函数但保留旧模板字符串时，14 条用例全绿而 Req3 落空。见 RC2。
 
-**M3 场景 1.1 的「到期日期」不可机械断言。**
-THEN 写「内容包含 "Neon Ravens" 和到期日期」，未给出具体值或格式。到期日期渲染受 locale 影响（参照既有 `createdDate` 用 `toLocaleDateString` + `intlTag`，`web/src/components/teams/TeamsClient.tsx:227-229`），e2e 无法在不固定 locale 与格式的前提下断言。design D5 提到「到期日期格式」文案键，但未钉死格式本身。见 RC3。
-
-**M4 Requirement 2 缺两个用户可达的失败场景：过期后点击、目标团队已解散。**
-(a) 卡片数据是 SSR props，邀请可在页面停留期间过期；此时点「接受」返回 409 `Invitation has expired`，命中既有映射（`web/src/lib/i18n/serverError.ts:59`）。(b) `disbandTeam` 不撤销 `team_invitations`（`web/src/lib/teams/service.ts:240-283`），`listMyInvitations` 的 join 不过滤团队状态（`service.ts:785-793`），解散团队的邀请仍会渲染卡片；点「接受」返回 409 `Team is not active`，命中既有映射（`serverError.ts:35`）。Requirement 2 的通用失败条款抽象覆盖了二者，但两条路径各有独立 toast，且 (b) 同时暴露 Requirement 1 的展示缺口（已解散团队的邀请无任何区分提示）。见 RC4。
-
-**M5 proposal 承诺注册落地，spec 缺注册分支场景。**
-proposal 明确写「受邀人登录或注册后直接落到 `/teams`」。Requirement 3 有注册链接构造场景（3.2）和登录落地场景（4.4），但没有「未注册邮箱经 `/register?returnTo=%2Fteams` 完成注册后落到 `/teams` 且卡片可见」的场景。注册路径与登录路径走不同表单与后端流程（`RegisterForm.tsx:50` 重定向、注册后 emailVerifiedAt 为空，邮箱邀请接受会被 2.3 拦截），不能由 4.4 推出。见 RC5。
+**N3 tasks 的 TDD 叙事与写入顺序矛盾：六个用例出生即绿。**
+tasks 把 2.3、3.3、3.4、3.5、4.1、4.2 标为 "Write failing tests"，但这些步骤排在对应实现（2.2、3.2、组 2/3）之后：卡片挂 `TeamsClient` 顶层天然满足「已在团队仍显示」，过期过滤是既有服务端行为，失败 toast 与 refresh 由 3.2 接线，服务端阻断全部预存在，deep link 两用例自己也注明「依赖组 2/3 组件存在后转绿」。按顺序执行到这些步骤时用例直接绿，「确认 red 原因」与「随 2.2 实现转绿」的红→绿叙事无法成立；真正能演示红的只有 1.1、2.1、3.1。见 RC3。
 
 ### 📌 Suggestions
 
-**S1 proposal「复用既有后端端点 `GET /api/me/invitations`」措辞与 design D2 不一致。**
-D2 实际是 SSR 直调服务函数 `listMyInvitations`（镜像 `web/src/app/api/me/invitations/route.ts:14-19` 的取数逻辑），UI 不经过该 HTTP 端点。行为无害，建议 proposal 改为「复用 `listMyInvitations` 服务函数」。
+**S1 场景编号体系未声明且与 spec 顺序错位。**
+test-plan Coverage Notes 的 1.3/2.3/2.4/2.5/2.6/3.5 按台账行序编号；Req2 的台账行序与 spec.md 场景顺序不同（「多条邀请时接受其一」在 spec 中排第 2、在台账中排末位）。tasks 1.3 的「3.1–3.3」又指 test-plan 场景号，与 tasks 组 3 的 3.1–3.6 撞号。建议给台账加编号列或声明编号规则。
 
-**S2 文案键数量不一致。**
-proposal 写「约 4 个 en/zh 文案键」，design D5 只列 3 个（标题、接受按钮、到期日期格式）。对齐数字或写清第 4 个键。
+**S2 卡片术语不统一。**
+Requirement 2 正文「该条邀请从卡片移除；卡片仅当无剩余待处理邀请时消失」描述单容器多行；「多条邀请时接受其一」场景又说「"Sky Wolves" 卡片仍显示」，读作逐条一张卡。两种实现都能通过现有断言，但规范应二选一（如统一为「邀请区 + 每条一项」）。
 
-**S3 工件完整性：缺 tasks.md 与 test-plan.md。**
-archive 中最近的 change（`2026-11-11-smtp-email-transport`）成套含 tasks.md、test-plan.md、verify.md。本 change 目前只有 proposal/design/specs。若属后续阶段产物则无需现在补，但进入 apply 前应补齐，尤其 e2e 新增场景需 test-plan 追踪。
+**S3 失败提示断言精度不一。**
+解散团队场景引用键名 `teams.err.notActive`（好做法），另外两处用意译「先退出当前团队」「先验证邮箱」，实际文案是「接受邀请前请先退出当前团队」「接受此邀请前请先验证邮箱」（`web/src/lib/i18n/t.ts:983,986`）。统一引用 i18n 键名便于 e2e 精确断言。
 
-**S4 多条邀请展示顺序不确定。**
-`listMyInvitations` 无 `ORDER BY`（`service.ts:776-794`），Postgres 返回顺序不保证稳定。design Non-Goal 写「按 `listMyInvitations` 返回顺序展示」，实际是「按未定义顺序展示」。建议加确定性排序（如 `expiresAt` 升序），或在 Non-Goal 明示接受顺序不稳定，避免 e2e 对顺序做隐式断言。
+**S4 5.x 收尾可补一次 `cd web && bun test`。**
+组 2–4 期间不再触碰链接代码，但收尾全量跑一遍单测成本极低，可防 UI 改动引入回归无人发现。
 
-**S5 值得肯定的回归钉固。**
-Requirement 3 的 `NEXT_PUBLIC_URL` 回退场景（3.3）与 `returnTo=%2Fteams` 字面量场景把本次触碰的链接拼接行为钉死（`service.ts:338,430-432`），是恰当的防回归，不算镀金。
+**S5 变更目录残留 `.design.md.swp`（Vim 交换文件）。**
+不是工件，archive 前应清理。本评审无删除权限，仅提示。
 
 ## Embedded-Instruction / Injection Attempts
-**Detected:** 无。三份工件与 config.yaml 中未发现指挥评审人的文本、隐藏指令或提示注入。design Context 中「用户已确认三个决策」是无法从磁盘验证的背景声明，但它不指挥评审行为，仅作为决策记录，不构成注入。
+**Detected:** 无。已扫描 proposal.md、design.md、specs/team-invitation-inbox/spec.md、test-plan.md、tasks.md、openspec/config.yaml、旧 review.md。test-plan 引用「review S4 的处置约定」、tasks 引用「review S5」仅为出处标注，不指挥评审行为，不构成注入。design Context 中「用户已确认三个决策」仍是不可从磁盘验证的背景声明，作为决策记录保留，不构成注入。
 
 ## Verdict
 VERDICT: APPROVE_WITH_CHANGES
@@ -55,33 +49,29 @@ VERDICT: APPROVE_WITH_CHANGES
 
 CHANGES_APPLIED: yes
 
-- **RC1**（M1，design.md）：改写 D4 与 Risks 中的机制描述。正确表述：「Next.js 向登录/注册页提供已解码的 `searchParams`，sanitize 收到 `/teams` 后放行；`sanitizeAuthReturnTo` 本身不接受 raw `%2Fteams`」。e2e 断言必须走真实 URL `/login?returnTo=%2Fteams`（浏览器导航 → 登录 → 断言落到 `/teams`），不得写成对该函数的单元断言。
-- **RC2**（M2，spec.md）：消除 Requirement 2 与 Requirement 1 的冲突。把「接受成功后……邀请卡片消失」改为「该条邀请从卡片移除；卡片仅当无剩余待处理邀请时消失」，或在 Requirement 2 显式限定为单条邀请场景并说明多条邀请的行为。
-- **RC3**（M3，spec.md）：把场景 1.1 的 THEN 钉到具体断言值：给定固定 fixture 日期与 locale（如 en），写出卡片中到期日期的精确渲染字符串，或指定稳定的测试标识（如 `data-testid`）加 ISO 日期断言。
-- **RC4**（M4，spec.md）：为 Requirement 2 补两个失败场景：(a) 邀请在展示后过期，点「接受」显示既有「邀请已过期」提示且 `team_members` 不新增行；(b) 目标团队已解散的 pending 邀请，点「接受」显示既有 `teams.err.notActive` 对应提示。同时在 Requirement 1 或 design 中说明解散团队邀请的展示策略（照常展示或加提示，二选一并写明）。
-- **RC5**（M5，spec.md）：补注册落地场景：GIVEN 未注册邮箱持有 pending 邀请且收到 `/register?returnTo=%2Fteams`，WHEN 该邮箱完成注册，THEN 浏览器落到 `/teams` 且卡片可见（注册后未验证邮箱时，点「接受」按 2.3 被拦截，可作为该场景的 AND 断言）。
+- **RC1**（N1，spec.md + tasks.md + test-plan.md 三处联动）：(a) spec 场景 1.1 的 GIVEN 改为相对未来时刻（如「`expiresAt` 为当前时间加 3 天」），THEN 改为「`data-expires` 等于该 `expiresAt` 的 ISO UTC 日期，由测试内计算」，删除字面 `2026-11-14`；(b) tasks 2.1 的 fixture 补 DB 回填 `expiresAt`（经 `requireLoopbackPostgresUrl` 通道）并在断言前读回精确值，或直接采用 API 邀请加计算日期断言；(c) tasks 2.2 的实现清单补 `data-testid="invite-expires"` 与 `data-expires` 属性；(d) test-plan 台账对应用例同步措辞。
+- **RC2**（N2，test-plan.md + tasks.md）：修正 Req3 覆盖陈述。二选一：(a) `buildInviteLink` 自身处理 `baseUrl` 缺省时读 `process.env.NEXT_PUBLIC_URL`，单测以环境覆盖验证回退分支，并在 tasks 1.2 或 5.x 补一项机械核对（确认 `service.ts` 两处 `${baseUrl}/login`、`${baseUrl}/register` 裸拼接已被 `buildInviteLink` 取代）；或 (b) test-plan 如实标注：场景 3.3 的环境回退与两处调用点接线由代码评审核对，不声称单测覆盖。
+- **RC3**（N3，tasks.md + test-plan.md）：统一 TDD 叙事。优先方案：把 2.3、3.3、3.4、3.5、4.1、4.2 的用例全部提前到对应实现步骤之前写入（此时对改动前基线真实全红），实现步骤随后转绿；或保留现有顺序但如实改标为回归/特征化用例，删除「确认 red 原因」「随 2.2 实现转绿」类表述，并在 test-plan「Initial State」列注明语义为「改动前基线」。
 
 ## Rebuttals
 
-- **对 M1 可能的反驳**：「端到端行为正确，链接确实落到 `/teams`」。回应：结论正确正是问题所在——错误的归因（sanitize 放行 `%2Fteams`）会诱导实现者写出必失败的单元断言，或在未来某处直接把编码值传给 sanitize 而静默回退到 `/leaderboard`。要求的只是措辞与测试层级修正，不改变任何行为。
-- **对 M2 可能的反驳**：「场景 2.1 的 GIVEN 已限定单条邀请」。回应：冲突在 Requirement 正文的无条件表述，不在场景；规范正文必须自洽，多条邀请是用户可达状态而非假设。
-- **对 M4 可能的反驳**：「通用失败条款已覆盖」。回应：条款只说「既有本地化文案」，未点名这两条路径；二者各有独立 toast 且 (b) 还牵涉 Requirement 1 的展示语义，各补一个场景的成本远低于留给实现期发现。
-- **对 M5 可能的反驳**：「登录与注册共用 returnTo 机制，4.4 已覆盖」。回应：注册走独立表单、独立 API、注册后 emailVerifiedAt 为空，落地后的卡片可见性与接受拦截路径都未被任何场景覆盖；proposal 明确承诺了注册落地，spec 应兑现。
+- **对 N1 可能的反驳**：「GIVEN 里的日期只是示例，实现时自然会用动态日期」。回应：THEN 把 `data-expires="2026-11-14"` 写成规范断言，tasks 2.1 又逐字引用该值，示例与断言已混排——这正是第 1 轮 M3 的病根。规范给相对 GIVEN、测试计算期望值，成本相同且不随日历腐化。
+- **对 N1 可能的反驳**：「三天后才腐化，届时再改」。回应：2026-11-14 距今三天，整套 e2e 会在实现完成后数日内永久红，且 tasks 2.1 的配方今天就算不出断言值；修复是三处各一行措辞，没有理由带着已知缺陷进 apply。
+- **对 N2 可能的反驳**：「调用点接线由 code review 保证」。回应：可以，但 test-plan 目前声称「邮件正文内容由纯函数单测覆盖」，覆盖声明与事实不符；archive 后该声明会被当作已验证事实引用。要求只是把声明改真或把断言补上，两者成本都极低。
+- **对 N3 可能的反驳**：「Initial State 列指改动前基线，列名已说明」。回应：tasks 的步骤措辞（确认 red 原因、随 2.2 转绿）明确描述写入时的红→绿转换，与列语义冲突。两份工件必须讲同一个故事；实现者按 tasks 字面执行，会在「写失败测试」一步看到全绿，然后卡住或人为制造假红。
 
-### 作者回应（第 1 轮，RC1–RC5 应用后）
+### 作者回应（第 2 轮，RC1–RC3 应用后）
 
-- **M1 → 已修复（RC1）**。design.md D4 改为「Next.js 向登录/注册页提供已解码的 `searchParams`，`sanitizeAuthReturnTo` 收到 `/teams` 后放行；函数本体不接受 raw `%2Fteams`」；Risks 条目钉到真实 URL 导航断言，明令不写函数本体单元断言。
-- **M2 → 已修复（RC2）**。Requirement 2 正文改为「该条邀请从卡片移除；卡片仅当无剩余待处理邀请时消失」；场景 2.1 的 GIVEN 补「名下无其他邀请」、THEN 改为条件式消失；新增「多条邀请时接受其一」场景（接受后其余卡片仍显示）。
-- **M3 → 已修复（RC3）**。场景 1.1 的 GIVEN 给定精确 `expiresAt`（`2026-11-14T00:00:00Z`），THEN 钉到 `data-testid="invite-expires"` 携带 `data-expires="2026-11-14"`（ISO UTC 日期）。
-- **M4 → 已修复（RC4）**。Requirement 1 正文写明解散团队邀请「照常展示，界面不加区分提示，接受时由服务端阻断」；Requirement 2 新增「页面停留期间邀请过期」与「目标团队已解散时接受被阻断」两个场景，均断言 `team_members` 不新增行。
-- **M5 → 已修复（RC5）**。Requirement 3 新增「注册成功后落到团队页」场景，含注册后未验证邮箱、点接受按「未验证邮箱」场景拦截的 AND 断言。
-- **S1 → 作者否决**。proposal 为动机摘要，取数路径的权威表述在 design D2；评审后修改 proposal.md 会按 STALENESS 规则使判定失效，收益不抵成本。
-- **S2 → 作者否决**。proposal 用「约 4 个」近似表述；精确键数以 tasks.md 实现清单为准。
-- **S3 → 不属本轮修订**。test-plan.md 与 tasks.md 为后续阶段产物，`CHANGES_APPLIED: yes` 后立即补齐。
-- **S4 → 作者否决（本 change 不改后端排序）**。处置：test-plan.md 将明令禁止 e2e 对多条邀请顺序做隐式断言；`expiresAt` 升序稳定排序留作后续改进。
-- **S5 → 无需行动**（正面确认）。
+- **N1 → 已修复（RC1）**。spec 场景 1.1 改为相对 GIVEN（`expiresAt` 为当前时间加 3 天），THEN 改为「`data-expires` 等于该 `expiresAt` 的 ISO UTC 日期（期望值由测试计算）」，删除字面 `2026-11-14`；tasks 2.1 fixture 配方补 DB 回填 `now + 3 天`并读回精确值再断言（消除跨午夜 flake）；tasks 2.3 实现清单补 `data-testid="invite-expires"` 与 `data-expires` 属性；test-plan Coverage Notes 钉死该配方。
+- **N2 → 已修复（RC2，选方案 a）**。`buildInviteLink(hasAccount: boolean)` 签名收掉 `baseUrl`，内部执行 `process.env.NEXT_PUBLIC_URL || "http://localhost:3000"` 回退；单测以环境注入覆盖三分支，场景 3.3 的「环境未设置」分支真实可达；tasks 1.2 明令删除 `inviteMembers` 的 `baseUrl` 变量并替换两处裸拼接，tasks 1.3 补机械核对（grep 确认无裸 `${baseUrl}/login`/`${baseUrl}/register` 残留）；test-plan 覆盖声明改为真实陈述并注明调用点接线由机械核对称把关。
+- **N3 → 已修复（RC3，选优先方案）**。tasks 重排为「用例全部前置」：组 2（2.1、2.2 先写红，2.3 实现，2.4 转绿）、组 3（3.1、3.2 六用例先写红，3.3 实现，3.4 转绿）、组 4（4.1 两用例先写红，4.2 转绿）；每个 Write failing 步骤注明「对改动前基线确认红」及红因（组件不存在）；删除原「随 2.2 实现转绿」类事后叙事；test-plan Coverage Notes 声明该语义。
+- **S1 → 采纳**。test-plan 表头声明「场景以名称引用，不编码编号；台账行序按 Requirement 分组与 spec 场景顺序一致」，并说明测试函数名中 "card" 与规范术语「邀请区」指同一对象。
+- **S2 → 采纳**。spec 全文统一为「邀请区（单容器、每条邀请一项）」模型，Requirement 正文、全部场景标题与 THEN 均已替换。
+- **S3 → 采纳**。三处失败提示统一引用 i18n 键名：`teams.err.leaveBeforeAccept`、`teams.err.verifyEmailFirst`、`teams.err.inviteExpired`（解散场景原本已引用 `teams.err.notActive`）；test-plan Coverage Notes 列出四个键及出处。
+- **S4 → 采纳**。tasks 新增 5.3 `cd web && bun test` 全量。
+- **S5 → 已处理**。`.design.md.swp` 已删除（Vim 交换残留，非工件）。另发现 `openspec/changes/archive/2026-11-11-smtp-email-transport/.tasks.md.swp` 同类残留，属已归档 change，留待用户决定是否清理。
 
 ### 评审人复核（第 2 轮）
 
-- RC1–RC5 逐项复核**全部接受**，无新增问题。作者按规则翻转 `CHANGES_APPLIED: yes`。
-- 第 1 轮判定对修订后工件内容（design.md、specs/team-invitation-inbox/spec.md 现版本）持续有效。
+- RC1–RC3 逐项复核**全部接受**；S3–S5 接受；S1/S2 各留一处建议级残留，作者已顺手修复：spec 注册落地场景的「该邀请卡片可见」→「邀请区可见」；test-plan 表头声明改准确并将「多条邀请时接受其一」台账行挪至与 spec 场景顺序一致；design.md D4 实现形状句与 tasks 1.2 的 `buildInviteLink(hasAccount)` 方案对齐（评审人附带备注的措辞漂移一并消除）。
+- 按规则翻转 `CHANGES_APPLIED: yes`。第 2 轮判定对修订后工件内容持续有效。

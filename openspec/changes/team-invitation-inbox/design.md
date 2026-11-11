@@ -54,7 +54,7 @@
 
 ### D4 邮件链接追加 returnTo
 
-`service.ts:430-433` 两处模板字符串各改一行。已注册账号拼 `${baseUrl}/login?returnTo=${encodeURIComponent("/teams")}`，未注册邮箱拼对应的 `/register` 链接。放行链路：Next.js 向登录/注册页提供已解码的 `searchParams`，`sanitizeAuthReturnTo` 收到 `/teams` 后放行。该函数本身不接受 raw `%2Fteams`（不以 `/` 开头，命中不安全起点检查并回退默认值）。
+`service.ts` 新增 `buildInviteLink(hasAccount: boolean)`，内部执行 `process.env.NEXT_PUBLIC_URL || "http://localhost:3000"` 回退，按账号状态拼 `${base}/login?returnTo=...` 或 `${base}/register?returnTo=...`（`returnTo` 值为 `encodeURIComponent("/teams")`）。`inviteMembers` 内的 `baseUrl` 变量与两处裸拼接由该函数取代。放行链路：Next.js 向登录/注册页提供已解码的 `searchParams`，`sanitizeAuthReturnTo` 收到 `/teams` 后放行。该函数本身不接受 raw `%2Fteams`（不以 `/` 开头，命中不安全起点检查并回退默认值）。
 
 备选方案：邮件链接直接指向 `/teams`，由页面自身的登录门禁跳转登录。否决，门禁跳转丢失来路，登录后仍回不到 `/teams`。
 
