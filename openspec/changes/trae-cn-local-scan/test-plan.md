@@ -11,11 +11,13 @@
 | specs/trae-cn-local-scan/spec.md → 发现本地 TRAE CN 数据库 | 未安装时 lane 为空 | cli/tokens-core/src/scanner.rs (tests) | test_discover_trae_cn_dbs_absent_empty | 🔴 red |
 | specs/trae-cn-local-scan/spec.md → 解密快照 | 加密库解密并产出可查询快照 | cli/tokens-core/src/trae_db.rs (tests) | test_snapshot_decrypts_db_with_committed_wal | 🔴 red |
 | specs/trae-cn-local-scan/spec.md → 解密快照 | WAL 校验和链中断只取中断点之前 | cli/tokens-core/src/trae_db.rs (tests) | test_snapshot_wal_chain_break_takes_prefix | 🔴 red |
-| specs/trae-cn-local-scan/spec.md → 解密快照 | WAL salt 不匹配时只用主文件 | cli/tokens-core/src/trae_db.rs (tests) | test_snapshot_wal_salt_mismatch_uses_main | 🔴 red |
+| specs/trae-cn-local-scan/spec.md → 解密快照 | WAL 帧 salt 与 WAL 头不一致的残留帧不生效 | cli/tokens-core/src/trae_db.rs (tests) | test_snapshot_wal_stale_frame_salt_takes_valid_prefix | 🔴 red |
+| specs/trae-cn-local-scan/spec.md → 解密快照 | WAL salt 与主库 salt 不同仍正常合并 | cli/tokens-core/src/trae_db.rs (tests) | test_snapshot_wal_merges_despite_main_db_salt_difference | 🔴 red |
 | specs/trae-cn-local-scan/spec.md → 解密快照 | 只有未提交帧的 WAL 不生效 | cli/tokens-core/src/trae_db.rs (tests) | test_snapshot_wal_uncommitted_only_ignored | 🔴 red |
 | specs/trae-cn-local-scan/spec.md → 解密快照 | 源文件持续变化时跳过并告警 | cli/tokens-core/src/trae_db.rs (tests) | test_snapshot_stat_retry_exhausted_skips_db | 🔴 red |
 | specs/trae-cn-local-scan/spec.md → 解密快照 | 密钥不匹配时跳过该 DB | cli/tokens-core/src/trae_db.rs (tests) | test_snapshot_key_mismatch_skips | 🔴 red |
 | specs/trae-cn-local-scan/spec.md → 解密快照 | 截断尾页 | cli/tokens-core/src/trae_db.rs (tests) | test_snapshot_truncated_tail_page_count | 🔴 red |
+| specs/trae-cn-local-scan/spec.md → 解密快照 | 已知答案：官方向量可解密且页 HMAC 通过、IV 篡改触发失败 | cli/tokens-core/src/trae_db.rs (tests) | test_kat_official_vector_decrypts_and_hmac_passes | 🔴 red |
 | specs/trae-cn-local-scan/spec.md → 坏页容忍与可见性 | 单个坏页不阻断扫描且计数可见 | cli/tokens-core/src/trae_db.rs (tests) | test_bad_page_continues_and_counts | 🔴 red |
 | specs/trae-cn-local-scan/spec.md → 坏页容忍与可见性 | 缓存命中扫描不重发坏页计数 | cli/tokens-core/src/lib.rs (tests) | test_cache_hit_does_not_reemit_bad_page_diag | 🔴 red |
 | specs/trae-cn-local-scan/spec.md → 坏页容忍与可见性 | 置零导致查询失败时跳过该 DB | cli/tokens-core/src/trae_db.rs (tests) | test_zeroed_interior_page_skips_db | 🔴 red |
@@ -32,6 +34,9 @@
 | specs/trae-cn-local-scan/spec.md → 逐 turn 解析与归一化 | session_title 保持为空 | cli/tokens-core/src/sessions/trae_cn.rs (tests) | test_session_title_stays_none | 🔴 red |
 | specs/trae-cn-local-scan/spec.md → 逐 turn 去重 | 同一 session 的多个 turn 全部保留 | cli/tokens-core/src/sessions/trae_cn.rs (tests) | test_dedupe_keeps_all_turns_in_session | 🔴 red |
 | specs/trae-cn-local-scan/spec.md → 逐 turn 去重 | 同一 turn 重复出现时取最新 | cli/tokens-core/src/sessions/trae_cn.rs (tests) | test_dedupe_same_turn_latest_updated_at_wins | 🔴 red |
+| specs/trae-cn-local-scan/spec.md → 逐 turn 去重 | 跨库重复 turn 在缓存与发现顺序各安排下保留最新且仅计一次 | cli/tokens-core/src/sessions/trae_cn.rs (tests) | test_dedupe_cross_db_newest_wins_across_cache_and_order | 🔴 red |
+| specs/trae-cn-local-scan/spec.md → 逐 turn 去重 | updated_at 并列时裁决与顺序无关 | cli/tokens-core/src/sessions/trae_cn.rs (tests) | test_dedupe_updated_at_tie_break_deterministic | 🔴 red |
+| specs/trae-cn-local-scan/spec.md → 逐 turn 去重 | updated_at 为 NULL 的行照常产出 | cli/tokens-core/src/sessions/trae_cn.rs (tests) | test_dedupe_missing_updated_at_still_emitted | 🔴 red |
 | specs/trae-cn-local-scan/spec.md → 成本归属 | 已覆盖模型直接命中上游数据集 | cli/tokens-core/src/pricing/mod.rs (tests) | test_deepseek_v4_flash_first_party_resolves | 🔴 red |
 | specs/trae-cn-local-scan/spec.md → 成本归属 | doubao 模型映射到 volcengine 提示 | cli/tokens-core/src/sessions/trae_cn.rs (tests) | test_doubao_model_maps_to_volcengine_hint | 🔴 red |
 | specs/trae-cn-local-scan/spec.md → 成本归属 | Archive 费率对转售商行保持优先 | cli/tokens-core/src/pricing/mod.rs (tests) | test_archive_volcengine_doubao_beats_reseller | 🔴 red |
@@ -44,7 +49,9 @@
 
 ## Coverage Notes
 
-- 解密快照、坏页两组共 10 个测试依赖**合成加密 fixture 构造器**（按 D1 参数加密合成页、构造 WAL 帧：已提交/链断裂/salt 不匹配/仅未提交/坏页/截断尾页）。构造器是 `trae_db.rs` 测试模块的共享工具，先于组内测试实现（tasks 组 1 首项）。
+- 解密快照、坏页两组共 12 个测试，其中 11 个依赖**合成加密 fixture 构造器**（按 D1 参数加密合成页、构造 WAL：已提交/链断裂/帧 salt 与 WAL 头 salt 不匹配的前缀+残留帧/仅未提交/坏页/截断尾页）；`test_kat_official_vector_decrypts_and_hmac_passes` 独立于该构造器。构造器是 `trae_db.rs` 测试模块的共享工具，先于组内测试实现（tasks 组 1 首项）。合成 WAL 的头/帧 salt 独立生成，**不得**人为与主库页 1 salt 相等。
+- KAT 向量由官方 SQLCipher 实现生成（无用户数据，二进制 fixture 入仓库，附版本与参数记录），与合成构造器不同源；同时断言 IV 篡改触发页 HMAC 失败。该测试防住构造器与解密器同源互逆的系统性错误（R3-P1-2）。
+- 去重跨库/缓存测试（test_dedupe_cross_db_newest_wins_across_cache_and_order）以两个合成 DB 为源，参数化四种安排：全冷、一冷一热（新版本库走缓存命中）、全热、发现顺序互换；缓存路径复用 message_cache 测试的临时目录与 CacheIdentity 重定向先例。并列与 NULL 场景直接构造消息向量调用 `dedupe_trae_cn_turns`。
 - "无权限目录"测试用 chmod 000 模拟 EACCES（macOS/Linux）；Windows CI 上跳过该断言的 root 部分只校验诊断路径。
 - "源文件持续变化"测试通过在 stat 前哨之间用后台线程改写 mtime/size 模拟。
 - 缓存命中测试（test_cache_hit_does_not_reemit_bad_page_diag）复用 message_cache 测试的临时目录与 CacheIdentity 重定向模式（`lib.rs` 既有 sqlite lane 测试先例）。

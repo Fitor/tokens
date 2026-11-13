@@ -30,14 +30,15 @@
 
 ### D1. 解密实现：纯 Rust 页解密，不链接 SQLCipher C 库
 
-- `trae_db.rs`（tokens-core）实现：salt = 页 1 前 16 字节 XOR `0x3a`；`hmacKey = PBKDF2-HMAC-SHA512(key, salt, 2 轮, 32 字节)`；每页 AES-256-CBC（页尾 80 字节保留区 = 16 字节 IV + 64 字节 HMAC-SHA512，覆盖密文 + LE 页号）；页 1 解密后回写 SQLite 头。
+- `trae_db.rs`（tokens-core）实现：kdf salt = 页 1 前 16 字节；`hmacKey = PBKDF2-HMAC-SHA512(key, kdf salt XOR 0x3a, 2 轮, 32 字节)`；每页 AES-256-CBC（页尾 80 字节保留区 = 16 字节 IV + 64 字节 HMAC-SHA512）。页 HMAC 输入为官方实现钉死的三段拼接：**页数据区密文（`page_sz − reserve_sz` 字节）‖ IV（16 字节）‖ 页号（u32 little-endian，4 字节）**；改动 IV 任一字节必然使该页 HMAC 失败。页 1 特殊偏移：前 16 字节 salt 区不参与加密与 HMAC，页 1 密文长度为 `page_sz − 16 − reserve_sz`，IV 仍在保留区开头；解密后前 16 字节回写 SQLite 头。参数依据：SQLCipher 官方实现 `sqlcipher.c`——`sqlcipher_page_hmac` 的 HMAC 覆盖"密文 + IV + 页号"且默认 `CIPHER_FLAG_LE_PGNO`（LE 页号），`sqlite3Codec`/`sqlcipher_page_cipher` 定义页 1 偏移；另见 [SQLCipher Security Design](https://www.zetetic.net/sqlcipher/design/)。
 - 依赖：新增 `hmac`、`pbkdf2`（纯 Rust）；`aes`、`cbc`、`sha2` 已在 workspace。
 - 备选：rusqlite `bundled-sqlcipher`。否决理由：引入 C 构建链与 OpenSSL 依赖，构建/分发复杂度明显上升；明文临时文件（0600，用完即删）是可接受的安全面。
 
 ### D11. 权威规格仓库内化（替代"demo 即规格"）
 
-- WAL 合并算法写成 `trae_db.rs` 的模块级文档注释，作为权威规格，覆盖：WAL 头 magic（`0x377f0682`/`0x377f0683`）、页大小字段、24 字节帧头、累计校验和链（big/little endian）、commit 字段语义、salt 链断点处理、spec 列出的三条边界语义（链中断、salt 不匹配、仅未提交帧）。
-- 测试全部使用程序化构造的合成加密 fixture：测试代码按 D1 参数加密合成页并构造 WAL（含已提交帧、校验和链断裂、salt 不匹配、仅未提交帧、坏页、截断尾页各一例）。CI 可复现，不依赖真实用户库。真实用户数据库与解密副本一律不入仓库。
+- WAL 合并算法写成 `trae_db.rs` 的模块级文档注释，作为权威规格，覆盖：WAL 头 magic（`0x377f0682`/`0x377f0683`）、32 字节 WAL 头（含 salt-1/salt-2 与头校验和）、页大小字段、24 字节帧头（页号、commit 字段、帧头 salt-1/salt-2 副本、累计校验和）、累计校验和链（字节序由 magic 最低位决定）、commit 字段语义、帧有效性判定（帧头 salt 与 WAL 头 salt 一致 + 校验链连续，首个失效帧之后全部无效）、spec 列出的边界语义（链中断、残留 salt 帧、仅未提交帧）。帧 salt 只与 WAL 头 salt 比较，与主库页 1 的密钥派生 salt 无关（依据 [SQLite WAL File Format / Reader Algorithm](https://www.sqlite.org/fileformat2.html#walformat)）。
+- 测试全部使用程序化构造的合成加密 fixture：测试代码按 D1 参数加密合成页并构造 WAL（含已提交帧、校验和链断裂、帧 salt 与 WAL 头 salt 不匹配的前缀+残留帧、仅未提交帧、坏页、截断尾页各一例；合成 WAL 的头/帧 salt 独立生成，不与主库页 1 salt 相等）。CI 可复现，不依赖真实用户库。真实用户数据库与解密副本一律不入仓库。
+- 已知答案测试（KAT）独立于被测加密构造器：用官方 SQLCipher 实现生成一个无用户数据的测试向量（空 schema + 若干空表页），以二进制 fixture 入仓库，并记录生成所用 SQLCipher 版本与参数（页大小、HMAC/KDF 算法与轮数、密钥形态）。测试断言本实现可解密该向量且逐页 HMAC 通过；另断言修改向量中任一页 IV 字节会使对应页 HMAC 失败。该测试防住"合成 fixture 构造器与解密器同源互逆、双双偏离官方实现"的系统性错误（如本轮 R3-P1-2 类错误可自洽通过合成测试）。
 
 ### D2. 快照输出：专用临时子目录，stat 前哨 + 重试 + 启动清扫
 
@@ -73,9 +74,10 @@
 - `session_title` 强制 `None`：CN 解析器不填充任何文本字段（M7 禁令）。
 - `prompt_tokens_total` 等聚合字段在 CN 数据中恒为 0，v1 不使用。
 
-### D7. 去重：按 `turn_id`，禁止复用 `dedupe_latest_trae_messages`
+### D7. 去重：按 `turn_id` 跨库去重，禁止复用 `dedupe_latest_trae_messages`
 
-- 新函数 `dedupe_trae_cn_turns`：key = `turn_id`，保留 `updated_at` 最大者。session 级折叠会导致 ~88% 少计（795 sessions × 平均 8.5 turns 折成 795 行），这是本 change 最危险的坑。
+- 新函数 `dedupe_trae_cn_turns`：key = `turn_id`，作用域是单次扫描内各 DB 消息**合并之后**的全体 trae-cn 消息（跨库、缓存命中与冷扫描混合后统一执行；单库解析内部不做去重）。保留 `updated_at` 最大者；缺失视为最小；并列先比 `created_at`，再比（`model_id`、五桶、`session_id`）序列化字节序——与发现顺序无关（并列裁决承接 R2-S1，沿用 `dedupe_latest_trae_messages` 的"时间并列比稳定键"先例形态，但不用 `dedup_key`，CN 行保持 `dedup_key: None` 以免接入全局提交去重）。session 级折叠会导致 ~88% 少计（795 sessions × 平均 8.5 turns 折成 795 行），这是本 change 最危险的坑。
+- `updated_at` 的传递通路：`UnifiedMessage`（`sessions/mod.rs`）新增 `#[serde(default)] pub updated_at_ms: Option<i64>`——语义为"源行 `updated_at`，毫秒"。CN 解析器从 `chat_turn.updated_at` 秒转毫秒填充（`checked_mul`，溢出或非数值置 `None`）；消息时间 `timestamp` 仍取 `created_at`，二者语义分离。该字段随 `UnifiedMessage` 一起被消息缓存 serde 序列化持久化（缓存 JSON 旧条目反序列化自然得 `None`，无需缓存迁移），因此缓存命中路径与冷扫描路径的比较基础一致。其他客户端恒不设置该字段。
 
 ### D8. 定价：Archive 行 + 解析器侧 provider 映射（修订定位）
 
@@ -85,7 +87,7 @@
 
 ### D9. 管线接入：两条流程各加 lane，指纹走缓存 lane
 
-- collect 流（`lib.rs` ~3376 区域，Trae 块旁）与 ParsedMessage 流（~6206 区域）各加一个 trae-cn 块；解析走 `load_or_parse_sqlite_source`（CacheIdentity + `check_sqlite_path`），成本经 `apply_pricing_if_available`（`Estimated`）。
+- collect 流（`lib.rs` ~3376 区域，Trae 块旁）与 ParsedMessage 流（~6206 区域）各加一个 trae-cn 块；解析走 `load_or_parse_sqlite_source`（CacheIdentity + `check_sqlite_path`），成本经 `apply_pricing_if_available`（`Estimated`）。trae-cn 块内，各 DB 的消息先合并再执行一次 `dedupe_trae_cn_turns`（落点与既有 Trae 块"合并后调用 `dedupe_latest_trae_messages`"的形状一致，见 D7）。
 - 跳过 `micode` 式"免重定价"分支——CN 无权威成本，全部走估价。
 - `message_cache.rs` 每客户端 parser 版本表（穷举 match，缺臂编译失败）与 `sessions/mod.rs` 模块导出随实现补齐。
 
@@ -99,7 +101,7 @@
 - [SQLCipher 参数或密钥随 TRAE 版本变化] → 页 1 HMAC 预检，失败时明确报"密钥/格式不匹配"，DB 跳过不崩溃；密钥来源（TokenTracker 公开常量）写入代码注释。
 - [2.18GB 全量解密在 submit 频率下的耗时] → 实测 3.3 秒 + 查询约 1 秒；缓存 lane 保证 Trae 无写入时零解密（指纹命中）。
 - [坏页导致偏差] → 页级 HMAC 保证坏页解不出"看似合法的错误数据"；坏页计数在冷扫描 stderr 可见（D3）；置零破坏结构时整库跳过（D3）。
-- [崩溃留下明文快照] → 专用子目录 + pid 命名 + 基于 `process_liveness` 的启动清扫（D2）；SIGKILL/断电路径已覆盖。
+- [崩溃留下明文快照] → 专用子目录 + pid 命名 + 基于同策略 fail-alive PID 探测的启动清扫（D2，探测在 trae_db.rs 内自写，与 `process_liveness` 策略对齐）；SIGKILL/断电路径已覆盖。
 - [ai-chat schema 未知] → D5 门禁 + 跳过告警；用户实测数据全部来自 ai-agent，覆盖不受影响。
 - [服务端拒收窗口] → D10 runbook（web 先部署）+ 失败表现与用户自救路径写档；窗口收窄但不可消除，如实声明。
 - [转售商行 fuzzy 命中导致不可提交] → 既有 submission-safe 机制按设计拒绝；Archive 行补齐后 5 个模型均 submission-safe。

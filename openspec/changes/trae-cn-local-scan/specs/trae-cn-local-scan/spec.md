@@ -38,11 +38,13 @@
 
 ### Requirement: 解密快照
 
-系统必须用 TRAE 共享应用密钥对 `database.db` 做 SQLCipher 4 页解密，合并 WAL 中已提交的帧，产出只读快照。快照解密前必须用页 1 的 HMAC 验证密钥。WAL 合并语义：
+系统必须用 TRAE 共享应用密钥对 `database.db` 做 SQLCipher 4 页解密，合并 WAL 中已提交的帧，产出只读快照。快照解密前必须用页 1 的 HMAC 验证密钥。WAL 合并语义（帧有效性按 SQLite 官方 reader 算法判定，依据 fileformat2.html#walformat）：
 
+- 帧有效条件：帧头 salt-1/salt-2 与 WAL 头 salt 一致，且累计校验和链连续。首个失效帧之后的所有帧一律无效。
 - 帧校验和链中断时，只合并中断点之前的已提交帧。
-- WAL 头的 salt 与主库不匹配（WAL 重置残留）时，忽略整个 WAL，只用主文件。
-- WAL 只含未提交帧时，不用 WAL 的任何帧。
+- 帧头 salt 与 WAL 头 salt 不匹配（WAL 重置后的前代残留）的帧无效，只保留有效前缀内的已提交视图。
+- WAL 头/帧头的 salt 与主库页 1 前 16 字节的 SQLCipher 密钥派生 salt 之间没有相等约束，系统不得以任何一方为基准比较两者。
+- WAL 只含未提交帧时，或最后一个有效 commit 之后只有未提交帧时，这些帧不参与合并。
 
 源文件在快照生成期间变化（stat 前哨不一致）时，系统必须重新生成快照，最多重试 3 次；3 次后仍不一致则跳过该 DB 并输出警告。
 
@@ -58,11 +60,17 @@
 - **WHEN** 系统生成快照
 - **THEN** 快照只合并第 1..N-1 帧中的已提交页，第 N 帧及之后不生效
 
-#### Scenario: WAL salt 不匹配时只用主文件
+#### Scenario: WAL 帧 salt 与 WAL 头不一致的残留帧不生效
 
-- **GIVEN** 一个 `-wal` 其头 salt 与主库页 1 salt 不同
+- **GIVEN** 一个 `-wal` 头 salt 为 S1/S2，前 k 帧帧头 salt 为 S1/S2 且校验链有效（其中含已提交帧），其后残留帧的帧头 salt 为旧代值（WAL 重置残留）
 - **WHEN** 系统生成快照
-- **THEN** 快照内容只来自主文件，扫描不失败
+- **THEN** 快照只合并前 k 帧中的已提交页，残留帧不生效，扫描不失败
+
+#### Scenario: WAL salt 与主库 salt 不同仍正常合并
+
+- **GIVEN** 一个 `-wal` 其帧头 salt 与 WAL 头 salt 一致，但与主库页 1 前 16 字节的 SQLCipher 密钥派生 salt 不同（正常状态，二者无相等约束）
+- **WHEN** 系统生成快照
+- **THEN** WAL 已提交帧正常合并入快照，不因与主库 salt 数值不同而丢弃任何帧
 
 #### Scenario: 只有未提交帧的 WAL 不生效
 
@@ -143,6 +151,7 @@
 - `reasoning_tokens > completion_tokens`：跳过。
 - `model_id`、`session_id`、`turn_id` 任意一个超过 256 字节：跳过。
 - `created_at` 不是正数，或乘 1000 溢出：跳过。
+- `updated_at` 仅作去重元数据随消息携带（秒转毫秒，`checked_mul` 溢出或非数值视为缺失，比较键取最小），不作为消息时间使用，也不因自身不可用而跳行。
 - 通过校验的行：`input = prompt_tokens - cache_read_input_tokens`，`output = completion_tokens - reasoning_tokens`，`cache_read = cache_read_input_tokens`，`cache_write = 0`，`reasoning = reasoning_tokens`。
 - 模型名剥离 `__` 及其后缀并转小写；缺失或清洗后为空时用 `trae-unknown`。
 - `session_title` 必须保持 `None`：TRAE CN 解析器不得从数据库填充任何文本字段。
@@ -197,7 +206,9 @@
 
 ### Requirement: 逐 turn 去重
 
-CN 行是 turn 级增量。系统必须按 `turn_id` 去重：同一 `turn_id` 出现多次时，保留 `updated_at` 最大的一条。系统不得按 `session_id` 折叠：同一 session 的不同 turn 必须全部保留。
+CN 行是 turn 级增量。系统必须按 `turn_id` 在单次扫描合并后的全部 trae-cn 消息上做跨库去重：同一 `turn_id` 出现多次时（无论多行来自同一 DB、不同 DB 的副本，还是缓存命中与冷扫描的混合），保留 `updated_at` 最大的一条。系统不得按 `session_id` 折叠：同一 session 的不同 turn 必须全部保留。
+
+去重所用的 `updated_at` 必须来自数据库行并随消息走完整条管线（含消息缓存的序列化持久化与缓存命中路径）；不得用消息时间代替——消息时间仍取 `created_at`，二者语义分离。`updated_at` 为非数值（含 NULL）或转毫秒溢出的行照常产出，仅其比较键视为最小。`updated_at` 并列时的裁决必须确定且与发现顺序无关：先取 `created_at` 较大者，仍并列时取（`model_id`、五桶用量、`session_id`）序列化字节序较大者。
 
 #### Scenario: 同一 session 的多个 turn 全部保留
 
@@ -210,6 +221,24 @@ CN 行是 turn 级增量。系统必须按 `turn_id` 去重：同一 `turn_id` �
 - **GIVEN** 同一 `turn_id` 两行，`updated_at` 分别为 t1 与 t2（t2 晚于 t1），用量不同
 - **WHEN** 系统去重
 - **THEN** 只产出 1 条消息，用量取 t2 行
+
+#### Scenario: 跨库重复 turn 在缓存与发现顺序各安排下保留最新且仅计一次
+
+- **GIVEN** 两个 DB 各含同一 `turn_id` 的 completed 行，`updated_at` 分别为 t1 与 t2（t2 晚于 t1），用量不同；四种安排：两库全冷、一冷一热（t2 库为缓存命中）、两库全热、发现顺序与上述互换
+- **WHEN** 系统在四种安排下分别扫描并去重
+- **THEN** 每种安排都只产出 1 条该 turn 的消息，用量取 t2 行，四种安排结果一致
+
+#### Scenario: updated_at 并列时裁决与顺序无关
+
+- **GIVEN** 同一 `turn_id` 两行，`updated_at` 相同且 `created_at` 相同，五桶用量不同
+- **WHEN** 系统去重，并以两种发现顺序分别执行
+- **THEN** 两种顺序产出同一条消息（按序列化字节序裁决），不因顺序不同而翻转
+
+#### Scenario: updated_at 为 NULL 的行照常产出
+
+- **GIVEN** 一行 `updated_at` 为 NULL、其余校验通过，另一同 `turn_id` 行的 `updated_at` 为可用数值
+- **WHEN** 系统去重
+- **THEN** 只产出 1 条，取 `updated_at` 可用的一行；扫描不报错
 
 ### Requirement: 成本归属
 

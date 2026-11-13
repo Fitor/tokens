@@ -5,15 +5,16 @@
 ## 1. 解密模块骨架（`trae_db.rs` + fixture 构造器）
 
 - [ ] 1.1 在 `cli/tokens-core/Cargo.toml` 新增 `hmac`、`pbkdf2` 依赖；创建 `trae_db.rs` 模块骨架（SQLCipher 参数文档注释作为权威规格，含 D11 的 WAL 算法规格）。
-- [ ] 1.2 实现合成加密 fixture 构造器（测试模块内）：按 D1 参数加密合成页（含最小 `chat_turn` schema 的明文页）、构造 WAL 帧（已提交/链断裂/salt 不匹配/仅未提交/坏页/截断尾页六类）。
+- [ ] 1.2 实现合成加密 fixture 构造器（测试模块内）：按 D1 参数加密合成页（含最小 `chat_turn` schema 的明文页）、构造 WAL（已提交/链断裂/帧 salt 与 WAL 头 salt 不匹配的前缀+残留帧/仅未提交/坏页/截断尾页六类；合成 WAL 的头/帧 salt 独立生成，不与主库页 1 salt 相等）。
 - [ ] 1.3 Write failing test: `test_snapshot_decrypts_db_with_committed_wal`（断言先因函数缺失/返回错误失败，即红灯）。
-- [ ] 1.4 Implement: 页解密（salt XOR `0x3a`、PBKDF2-HMAC-SHA512 2 轮、AES-256-CBC、页 HMAC 校验、页 1 头回写）使 1.3 转绿。
+- [ ] 1.4 Implement: 页解密（kdf salt = 页 1 前 16 字节、hmacKey = PBKDF2-HMAC-SHA512(key, kdf salt XOR `0x3a`, 2 轮, 32 字节)、AES-256-CBC、页 HMAC 校验（输入 = 密文 ‖ IV ‖ LE 页号，页 1 排除前 16 字节 salt 区）、页 1 头回写）使 1.3 转绿。
 - [ ] 1.5 Refactor；全套测试保持绿。
+- [ ] 1.6 已知答案测试（独立于 1.2 的合成构造器）：用官方 SQLCipher 实现生成无用户数据测试向量（空 schema + 若干空表页，二进制 fixture 入仓库，附生成版本与参数：页大小、HMAC/KDF 算法与轮数、密钥形态）；Write failing test `test_kat_official_vector_decrypts_and_hmac_passes`——断言实现可解密该向量且逐页 HMAC 通过，另断言修改向量中任一页 IV 字节后对应页 HMAC 失败；随 1.4 的实现转绿。
 
 ## 2. WAL 合并与快照边界
 
-- [ ] 2.1 Write failing tests: `test_snapshot_wal_chain_break_takes_prefix`、`test_snapshot_wal_salt_mismatch_uses_main`、`test_snapshot_wal_uncommitted_only_ignored`、`test_snapshot_truncated_tail_page_count`、`test_snapshot_stat_retry_exhausted_skips_db`、`test_snapshot_key_mismatch_skips`。
-- [ ] 2.2 Implement: WAL 索引（帧头校验和链、commit 字段、salt 断点三语义）、stat 前哨 + 3 次重试 + 跳过告警、页 1 HMAC 预检、截断尾页处理、`DecryptStats` 返回结构。
+- [ ] 2.1 Write failing tests: `test_snapshot_wal_chain_break_takes_prefix`、`test_snapshot_wal_stale_frame_salt_takes_valid_prefix`、`test_snapshot_wal_merges_despite_main_db_salt_difference`、`test_snapshot_wal_uncommitted_only_ignored`、`test_snapshot_truncated_tail_page_count`、`test_snapshot_stat_retry_exhausted_skips_db`、`test_snapshot_key_mismatch_skips`。
+- [ ] 2.2 Implement: WAL 有效前缀索引（帧有效性 = 帧头 salt 与 WAL 头 salt 一致 + 累计校验链连续，首个失效帧之后全部无效；commit 字段定最后有效提交视图；主库页 1 的 SQLCipher salt 不参与帧判定）、stat 前哨 + 3 次重试 + 跳过告警、页 1 HMAC 预检、截断尾页处理、`DecryptStats` 返回结构。
 - [ ] 2.3 Refactor；全套测试保持绿。
 
 ## 3. 坏页容忍与明文快照生命周期
@@ -42,8 +43,8 @@
 
 ## 7. 逐 turn 去重
 
-- [ ] 7.1 Write failing tests: `test_dedupe_keeps_all_turns_in_session`、`test_dedupe_same_turn_latest_updated_at_wins`。
-- [ ] 7.2 Implement: `dedupe_trae_cn_turns`（key = `turn_id`，保留 `updated_at` 最大者；不复用 `dedupe_latest_trae_messages`）。
+- [ ] 7.1 Write failing tests: `test_dedupe_keeps_all_turns_in_session`、`test_dedupe_same_turn_latest_updated_at_wins`、`test_dedupe_cross_db_newest_wins_across_cache_and_order`（全冷/一冷一热/全热/发现顺序互换四安排参数化）、`test_dedupe_updated_at_tie_break_deterministic`、`test_dedupe_missing_updated_at_still_emitted`。
+- [ ] 7.2 Implement: `UnifiedMessage` 新增 `#[serde(default)] pub updated_at_ms: Option<i64>`（CN 解析器从 `chat_turn.updated_at` 秒转毫秒填充，`checked_mul` 溢出或非数值置 `None`；其他客户端不设置，旧缓存条目反序列化自然为 `None`，无需缓存迁移）；`dedupe_trae_cn_turns`（key = `turn_id`，作用域为单次扫描合并后的全部消息，保留 `updated_at` 最大者，缺失视为最小，并列先比 `created_at` 再比载荷序列化字节序；不复用 `dedupe_latest_trae_messages`，CN 行 `dedup_key` 保持 `None`）；两条流程 lane 内在各 DB 消息合并之后调用（D9）。
 - [ ] 7.3 Refactor；全套测试保持绿。
 
 ## 8. 成本归属
