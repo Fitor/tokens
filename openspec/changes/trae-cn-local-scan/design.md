@@ -39,6 +39,7 @@
 - WAL 合并算法写成 `trae_db.rs` 的模块级文档注释，作为权威规格，覆盖：WAL 头 magic（`0x377f0682`/`0x377f0683`）、32 字节 WAL 头（含 salt-1/salt-2 与头校验和）、页大小字段、24 字节帧头（页号、commit 字段、帧头 salt-1/salt-2 副本、累计校验和）、累计校验和链（字节序由 magic 最低位决定）、commit 字段语义、帧有效性判定（帧头 salt 与 WAL 头 salt 一致 + 校验链连续，首个失效帧之后全部无效）、spec 列出的边界语义（链中断、残留 salt 帧、仅未提交帧）。帧 salt 只与 WAL 头 salt 比较，与主库页 1 的密钥派生 salt 无关（依据 [SQLite WAL File Format / Reader Algorithm](https://www.sqlite.org/fileformat2.html#walformat)）。
 - 测试全部使用程序化构造的合成加密 fixture：测试代码按 D1 参数加密合成页并构造 WAL（含已提交帧、校验和链断裂、帧 salt 与 WAL 头 salt 不匹配的前缀+残留帧、仅未提交帧、坏页、截断尾页各一例；合成 WAL 的头/帧 salt 独立生成，不与主库页 1 salt 相等）。CI 可复现，不依赖真实用户库。真实用户数据库与解密副本一律不入仓库。
 - 已知答案测试（KAT）独立于被测加密构造器：用官方 SQLCipher 实现生成一个无用户数据的测试向量（空 schema + 若干空表页），以二进制 fixture 入仓库，并记录生成所用 SQLCipher 版本与参数（页大小、HMAC/KDF 算法与轮数、密钥形态）。测试断言本实现可解密该向量且逐页 HMAC 通过；另断言修改向量中任一页 IV 字节会使对应页 HMAC 失败。该测试防住"合成 fixture 构造器与解密器同源互逆、双双偏离官方实现"的系统性错误（如本轮 R3-P1-2 类错误可自洽通过合成测试）。
+- 语义交叉核对（2026-11-13）：修订后的 WAL/HMAC 规格已与本机可行性 demo 逐条比对一致——该 demo 参考自 TokenTracker（xiufengsun/TokenTracker，MIT）的已验证实现（`trae-scan-demo.js`）。demo 中：HMAC 输入为"密文（页 1 从 16 字节起）‖ IV ‖ LE 页号"，无任何"WAL salt 与主库 salt 比较"逻辑，帧 salt 与 WAL 头 salt 比对、累计链断裂即停。可见第 3 轮两个 P1 是规划工件转写 demo 行为时的错误，不是 demo/TokenTracker 行为本身有误。
 
 ### D2. 快照输出：专用临时子目录，stat 前哨 + 重试 + 启动清扫
 
