@@ -1,0 +1,53 @@
+# Test Plan: trae-cn-local-scan
+
+<!-- LIVE LEDGER：apply 阶段每行 🔴 red → 🟢 green；verify 审计无 red 残留。 -->
+
+| Requirement | Scenario | Test File | Test Name | Initial State |
+|-------------|----------|-----------|-----------|---------------|
+| specs/trae-cn-local-scan/spec.md → 发现本地 TRAE CN 数据库 | macOS 标准安装被发现 | cli/tokens-core/src/scanner.rs (tests) | test_discover_trae_cn_dbs_standard_layout | 🔴 red |
+| specs/trae-cn-local-scan/spec.md → 发现本地 TRAE CN 数据库 | 环境变量覆盖扫描根目录 | cli/tokens-core/src/scanner.rs (tests) | test_discover_trae_cn_dbs_env_override | 🔴 red |
+| specs/trae-cn-local-scan/spec.md → 发现本地 TRAE CN 数据库 | 同一根下两个模块 DB 都被收集 | cli/tokens-core/src/scanner.rs (tests) | test_discover_trae_cn_dbs_collects_all_modules | 🔴 red |
+| specs/trae-cn-local-scan/spec.md → 发现本地 TRAE CN 数据库 | 无权限目录不被静默丢弃 | cli/tokens-core/src/scanner.rs (tests) | test_discover_trae_cn_dbs_eacces_reported | 🔴 red |
+| specs/trae-cn-local-scan/spec.md → 发现本地 TRAE CN 数据库 | 未安装时 lane 为空 | cli/tokens-core/src/scanner.rs (tests) | test_discover_trae_cn_dbs_absent_empty | 🔴 red |
+| specs/trae-cn-local-scan/spec.md → 解密快照 | 加密库解密并产出可查询快照 | cli/tokens-core/src/trae_db.rs (tests) | test_snapshot_decrypts_db_with_committed_wal | 🔴 red |
+| specs/trae-cn-local-scan/spec.md → 解密快照 | WAL 校验和链中断只取中断点之前 | cli/tokens-core/src/trae_db.rs (tests) | test_snapshot_wal_chain_break_takes_prefix | 🔴 red |
+| specs/trae-cn-local-scan/spec.md → 解密快照 | WAL salt 不匹配时只用主文件 | cli/tokens-core/src/trae_db.rs (tests) | test_snapshot_wal_salt_mismatch_uses_main | 🔴 red |
+| specs/trae-cn-local-scan/spec.md → 解密快照 | 只有未提交帧的 WAL 不生效 | cli/tokens-core/src/trae_db.rs (tests) | test_snapshot_wal_uncommitted_only_ignored | 🔴 red |
+| specs/trae-cn-local-scan/spec.md → 解密快照 | 源文件持续变化时跳过并告警 | cli/tokens-core/src/trae_db.rs (tests) | test_snapshot_stat_retry_exhausted_skips_db | 🔴 red |
+| specs/trae-cn-local-scan/spec.md → 解密快照 | 密钥不匹配时跳过该 DB | cli/tokens-core/src/trae_db.rs (tests) | test_snapshot_key_mismatch_skips | 🔴 red |
+| specs/trae-cn-local-scan/spec.md → 解密快照 | 截断尾页 | cli/tokens-core/src/trae_db.rs (tests) | test_snapshot_truncated_tail_page_count | 🔴 red |
+| specs/trae-cn-local-scan/spec.md → 坏页容忍与可见性 | 单个坏页不阻断扫描且计数可见 | cli/tokens-core/src/trae_db.rs (tests) | test_bad_page_continues_and_counts | 🔴 red |
+| specs/trae-cn-local-scan/spec.md → 坏页容忍与可见性 | 缓存命中扫描不重发坏页计数 | cli/tokens-core/src/lib.rs (tests) | test_cache_hit_does_not_reemit_bad_page_diag | 🔴 red |
+| specs/trae-cn-local-scan/spec.md → 坏页容忍与可见性 | 置零导致查询失败时跳过该 DB | cli/tokens-core/src/trae_db.rs (tests) | test_zeroed_interior_page_skips_db | 🔴 red |
+| specs/trae-cn-local-scan/spec.md → schema 门禁 | 同构 DB 正常解析 | cli/tokens-core/src/sessions/trae_cn.rs (tests) | test_schema_gate_passes_isomorphic_db | 🔴 red |
+| specs/trae-cn-local-scan/spec.md → schema 门禁 | 缺列 DB 被跳过且告警 | cli/tokens-core/src/sessions/trae_cn.rs (tests) | test_schema_gate_missing_column_skips_with_warning | 🔴 red |
+| specs/trae-cn-local-scan/spec.md → schema 门禁 | 门禁通过但查询失败时跳过 | cli/tokens-core/src/sessions/trae_cn.rs (tests) | test_schema_gate_query_failure_skips | 🔴 red |
+| specs/trae-cn-local-scan/spec.md → 逐 turn 解析与归一化 | 含缓存拆分的 turn 正确归一化 | cli/tokens-core/src/sessions/trae_cn.rs (tests) | test_normalize_turn_with_cache_split | 🔴 red |
+| specs/trae-cn-local-scan/spec.md → 逐 turn 解析与归一化 | total 对账失败的行被跳过 | cli/tokens-core/src/sessions/trae_cn.rs (tests) | test_skip_total_mismatch_row | 🔴 red |
+| specs/trae-cn-local-scan/spec.md → 逐 turn 解析与归一化 | cacheRead 超过 prompt 的行被跳过 | cli/tokens-core/src/sessions/trae_cn.rs (tests) | test_skip_cache_read_exceeds_prompt | 🔴 red |
+| specs/trae-cn-local-scan/spec.md → 逐 turn 解析与归一化 | reasoning 超过 completion 的行被跳过 | cli/tokens-core/src/sessions/trae_cn.rs (tests) | test_skip_reasoning_exceeds_completion | 🔴 red |
+| specs/trae-cn-local-scan/spec.md → 逐 turn 解析与归一化 | 负 cache_read 的行被跳过 | cli/tokens-core/src/sessions/trae_cn.rs (tests) | test_skip_negative_cache_read | 🔴 red |
+| specs/trae-cn-local-scan/spec.md → 逐 turn 解析与归一化 | dev 后缀剥离 | cli/tokens-core/src/sessions/trae_cn.rs (tests) | test_strip_dev_suffix | 🔴 red |
+| specs/trae-cn-local-scan/spec.md → 逐 turn 解析与归一化 | 时间戳溢出的行被跳过 | cli/tokens-core/src/sessions/trae_cn.rs (tests) | test_skip_timestamp_overflow | 🔴 red |
+| specs/trae-cn-local-scan/spec.md → 逐 turn 解析与归一化 | session_title 保持为空 | cli/tokens-core/src/sessions/trae_cn.rs (tests) | test_session_title_stays_none | 🔴 red |
+| specs/trae-cn-local-scan/spec.md → 逐 turn 去重 | 同一 session 的多个 turn 全部保留 | cli/tokens-core/src/sessions/trae_cn.rs (tests) | test_dedupe_keeps_all_turns_in_session | 🔴 red |
+| specs/trae-cn-local-scan/spec.md → 逐 turn 去重 | 同一 turn 重复出现时取最新 | cli/tokens-core/src/sessions/trae_cn.rs (tests) | test_dedupe_same_turn_latest_updated_at_wins | 🔴 red |
+| specs/trae-cn-local-scan/spec.md → 成本归属 | 已覆盖模型直接命中上游数据集 | cli/tokens-core/src/pricing/mod.rs (tests) | test_deepseek_v4_flash_first_party_resolves | 🔴 red |
+| specs/trae-cn-local-scan/spec.md → 成本归属 | doubao 模型映射到 volcengine 提示 | cli/tokens-core/src/sessions/trae_cn.rs (tests) | test_doubao_model_maps_to_volcengine_hint | 🔴 red |
+| specs/trae-cn-local-scan/spec.md → 成本归属 | Archive 费率对转售商行保持优先 | cli/tokens-core/src/pricing/mod.rs (tests) | test_archive_volcengine_doubao_beats_reseller | 🔴 red |
+| specs/trae-cn-local-scan/spec.md → 成本归属 | 无法定价的模型不谎报成本 | cli/tokens-core/src/lib.rs (tests) | test_unpriced_trae_cn_model_marks_incomplete_date | 🔴 red |
+| specs/trae-cn-local-scan/spec.md → 客户端注册与上报 | 默认提交包含 trae-cn | cli/tokens-core/tests/trae_cn_submit.rs | test_submit_default_includes_trae_cn | 🔴 red |
+| specs/trae-cn-local-scan/spec.md → 客户端注册与上报 | 服务端白名单接受新客户端 | web/src/lib/types.ts（CI 机械校验：`grep '"trae-cn"' web/src/lib/types.ts`） | supported-client-types-contains-trae-cn | N/A — non-executable |
+| specs/trae-cn-local-scan/spec.md → 国际版集成不变 | 国际版既有测试保持通过 | cli（`cargo test -p tokens-core trae && cargo test -p tokens-cli trae` + `git diff --exit-code` on 两个冻结文件） | existing_trae_suite_green_and_unmodified | 🔴 red |
+| specs/trae-cn-local-scan/spec.md → 国际版集成不变 | 国际版 ClientDef 条目逐字段不变 | cli/tokens-core/src/clients.rs (tests) | test_trae_clientdef_fields_unchanged | 🔴 red |
+| specs/trae-cn-local-scan/spec.md → 国际版集成不变 | 两个客户端数据并存 | cli/tokens-core/tests/trae_cn_submit.rs | test_trae_and_trae_cn_coexist | 🔴 red |
+
+## Coverage Notes
+
+- 解密快照、坏页两组共 10 个测试依赖**合成加密 fixture 构造器**（按 D1 参数加密合成页、构造 WAL 帧：已提交/链断裂/salt 不匹配/仅未提交/坏页/截断尾页）。构造器是 `trae_db.rs` 测试模块的共享工具，先于组内测试实现（tasks 组 1 首项）。
+- "无权限目录"测试用 chmod 000 模拟 EACCES（macOS/Linux）；Windows CI 上跳过该断言的 root 部分只校验诊断路径。
+- "源文件持续变化"测试通过在 stat 前哨之间用后台线程改写 mtime/size 模拟。
+- 缓存命中测试（test_cache_hit_does_not_reemit_bad_page_diag）复用 message_cache 测试的临时目录与 CacheIdentity 重定向模式（`lib.rs` 既有 sqlite lane 测试先例）。
+- `test_submit_default_includes_trae_cn` 与 `test_trae_and_trae_cn_coexist` 走既有聚合器构造路径（fixtures 目录模式同 `tests/common`）。
+- 白名单机械校验挂入 CI 脚本（与 web lint 同层执行）；该场景无 Rust 测试面，理由：`SUPPORTED_CLIENT_TYPES` 是 TS 常量数组，仓库 web 侧无 vitest/jest 测试设施。
+- 国际版"既有测试保持通过"的可执行形态：跑 trae 相关既有测试 + 对 `cli/tokens-cli/src/trae.rs`、`cli/tokens-core/src/sessions/trae.rs` 做 `git diff --exit-code`。两者任一失败即该行不绿。
