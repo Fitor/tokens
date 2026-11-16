@@ -75,10 +75,12 @@
 - `session_title` 强制 `None`：CN 解析器不填充任何文本字段（M7 禁令）。
 - `prompt_tokens_total` 等聚合字段在 CN 数据中恒为 0，v1 不使用。
 
-### D7. 去重：按 `turn_id` 跨库去重，禁止复用 `dedupe_latest_trae_messages`
+### D7. 去重：按消息携带的 `turn_id` 跨库去重，禁止复用 `dedupe_latest_trae_messages`
 
-- 新函数 `dedupe_trae_cn_turns`：key = `turn_id`，作用域是单次扫描内各 DB 消息**合并之后**的全体 trae-cn 消息（跨库、缓存命中与冷扫描混合后统一执行；单库解析内部不做去重）。保留 `updated_at` 最大者；缺失视为最小；并列先比 `created_at`，再比（`model_id`、五桶、`session_id`）序列化字节序——与发现顺序无关（并列裁决承接 R2-S1，沿用 `dedupe_latest_trae_messages` 的"时间并列比稳定键"先例形态，但不用 `dedup_key`，CN 行保持 `dedup_key: None` 以免接入全局提交去重）。session 级折叠会导致 ~88% 少计（795 sessions × 平均 8.5 turns 折成 795 行），这是本 change 最危险的坑。
+- 新函数 `dedupe_trae_cn_turns`：key = 消息携带的 `turn_id` 字段（传递通路见下），作用域是单次扫描内各 DB 消息**合并之后**的全体 trae-cn 消息（跨库、缓存命中与冷扫描混合后统一执行；单库解析内部不做去重）。保留 `updated_at` 最大者；缺失视为最小；并列先比 `created_at`，再比（`model_id`、五桶、`session_id`）序列化字节序——与发现顺序无关（并列裁决承接 R2-S1）。合并点不得用 session_id、消息时间或载荷相似度推断 turn 身份：同一 session 的两个不同 turn 其余字段可以完全相同，而同一 turn 的两个版本必须只留最新，用这三者猜身份必然丢 turn 或重复计。session 级折叠会导致 ~88% 少计（795 sessions × 平均 8.5 turns 折成 795 行），这是本 change 最危险的坑。
+- turn 身份的传递通路（R4-RC-1）：`UnifiedMessage`（`sessions/mod.rs`）新增 `#[serde(default)] pub turn_id: Option<String>`——语义为"源行 turn 身份"。CN 解析器把已过"非空且 ≤256 字节"校验的 `chat_turn.turn_id` 填入；`turn_id` 为 NULL/缺失或空字符串的行在解析期跳行（没有 turn 身份的行无法安全参与跨库去重）。该字段与 `updated_at_ms` 一样随 `UnifiedMessage` 被消息缓存序列化持久化（`CachedSourceEntry.messages` 直接存 `Vec<UnifiedMessage>`，`message_cache.rs:1623`；旧缓存条目反序列化自然得 `None`，无需缓存迁移），缓存命中与冷扫描在合并点的分组基础一致。其他客户端恒不设置该字段。
 - `updated_at` 的传递通路：`UnifiedMessage`（`sessions/mod.rs`）新增 `#[serde(default)] pub updated_at_ms: Option<i64>`——语义为"源行 `updated_at`，毫秒"。CN 解析器从 `chat_turn.updated_at` 秒转毫秒填充（`checked_mul`，溢出或非数值置 `None`）；消息时间 `timestamp` 仍取 `created_at`，二者语义分离。该字段随 `UnifiedMessage` 一起被消息缓存 serde 序列化持久化（缓存 JSON 旧条目反序列化自然得 `None`，无需缓存迁移），因此缓存命中路径与冷扫描路径的比较基础一致。其他客户端恒不设置该字段。
+- 不改用 `dedup_key`（对 R4 复核替代路线的核对结论）：`dedup_key` 在缓存层是承重字段——Claude 保留历史按它筛选（`retained_message_keys`，`message_cache.rs:2219`；`retained_history_key_filter` → `claudecode::dedup_key_is_globally_stable`，`message_cache.rs:2349`），缓存保存合并的去重键收集（`message_cache.rs:2313` 起）也读取它。CN 行一旦设置即接入这些按其他客户端语义定义的全局机制（全局稳定键判定、跨运行保留判定），影响无法局部化——这正是 CN 行保持 `dedup_key: None` 的理由，故 turn 身份走专用字段而非取消禁令。
 
 ### D8. 定价：Archive 行 + 解析器侧 provider 映射（修订定位）
 
@@ -89,6 +91,7 @@
 ### D9. 管线接入：两条流程各加 lane，指纹走缓存 lane
 
 - collect 流（`lib.rs` ~3376 区域，Trae 块旁）与 ParsedMessage 流（~6206 区域）各加一个 trae-cn 块；解析走 `load_or_parse_sqlite_source`（CacheIdentity + `check_sqlite_path`），成本经 `apply_pricing_if_available`（`Estimated`）。trae-cn 块内，各 DB 的消息先合并再执行一次 `dedupe_trae_cn_turns`（落点与既有 Trae 块"合并后调用 `dedupe_latest_trae_messages`"的形状一致，见 D7）。
+- turn 身份与 `updated_at_ms` 随 `UnifiedMessage` 走解析 → 缓存持久化 → 缓存命中 → 两条流程合并点的全链路（D7）；collect 流与 ParsedMessage 流各自都必须在合并后执行去重。缓存集成验收走真实装载路径，覆盖全冷、一冷一热（新版本分别在冷侧与热侧）、全热及发现顺序互换（test-plan 对应行）。
 - 跳过 `micode` 式"免重定价"分支——CN 无权威成本，全部走估价。
 - `message_cache.rs` 每客户端 parser 版本表（穷举 match，缺臂编译失败）与 `sessions/mod.rs` 模块导出随实现补齐。
 

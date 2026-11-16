@@ -31,7 +31,7 @@ CLI 目前只支持国际版 Trae：`tokens trae sync` 通过 vendor API 拉取�
 
 ## Impact
 
-- `cli/tokens-core`：`scanner.rs`（发现 `trae_cn_dbs`）、`clients.rs`（`ClientId::TraeCn`）、`lib.rs`（两条流程各加 lane）、`sessions/trae_cn.rs`（新）、`trae_db.rs`（新，含 fail-alive PID 探测，与 tokens-cli 的 `process_liveness.rs` 同策略）、`sessions/mod.rs`（导出新模块；`UnifiedMessage` 新增 `#[serde(default)] updated_at_ms: Option<i64>` 去重元数据字段，其他客户端恒为 `None`，旧缓存条目反序列化不受影响）、`message_cache.rs`（每客户端 parser 版本表加臂）、`pricing/mod.rs`（Archive 行）、`Cargo.toml`（新增 hmac、pbkdf2）。
+- `cli/tokens-core`：`scanner.rs`（发现 `trae_cn_dbs`）、`clients.rs`（`ClientId::TraeCn`）、`lib.rs`（两条流程各加 lane）、`sessions/trae_cn.rs`（新）、`trae_db.rs`（新，含 fail-alive PID 探测，与 tokens-cli 的 `process_liveness.rs` 同策略）、`sessions/mod.rs`（导出新模块；`UnifiedMessage` 新增 `#[serde(default)] turn_id: Option<String>` 与 `#[serde(default)] updated_at_ms: Option<i64>` 去重元数据字段（turn 身份与更新时间随消息缓存持久化，缓存命中与冷扫描在合并点的比较基础一致），其他客户端恒为 `None`，旧缓存条目反序列化不受影响）、`message_cache.rs`（每客户端 parser 版本表加臂）、`pricing/mod.rs`（Archive 行）、`Cargo.toml`（新增 hmac、pbkdf2）。
 - `cli/tokens-cli`：`main.rs`（`ClientFilter` 变体）。
 - `web/src/lib/types.ts`：`SUPPORTED_CLIENT_TYPES`。
 - 已知风险：`lib.rs` 现有 `dedupe_latest_trae_messages` 按 session 保留最新一行，语义是"session 级累计快照"。CN 行是 turn 级增量，复用它会把一个 session 折叠成一行，导致大量少计。CN lane 必须用按 `turn_id` 的独立去重。

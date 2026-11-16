@@ -150,6 +150,7 @@
 - `cache_read_input_tokens > prompt_tokens`：跳过（产生的负 input 会在提交前被聚合层钳位为 0，变成静默少计；跳行让异常显式可数）。
 - `reasoning_tokens > completion_tokens`：跳过。
 - `model_id`、`session_id`、`turn_id` 任意一个超过 256 字节：跳过。
+- `turn_id` 为 NULL、缺失或空字符串：跳过（没有 turn 身份的行无法参与跨库去重）。
 - `created_at` 不是正数，或乘 1000 溢出：跳过。
 - `updated_at` 仅作去重元数据随消息携带（秒转毫秒，`checked_mul` 溢出或非数值视为缺失，比较键取最小），不作为消息时间使用，也不因自身不可用而跳行。
 - 通过校验的行：`input = prompt_tokens - cache_read_input_tokens`，`output = completion_tokens - reasoning_tokens`，`cache_read = cache_read_input_tokens`，`cache_write = 0`，`reasoning = reasoning_tokens`。
@@ -204,9 +205,17 @@
 - **WHEN** 系统解析该行
 - **THEN** 产出消息的 `session_title` 为 `None`
 
+#### Scenario: turn_id 缺失的行被跳过
+
+- **GIVEN** 一行其余校验全部通过但 `turn_id` 为 NULL
+- **WHEN** 系统解析该行
+- **THEN** 该行不产出消息，跳过计数加 1
+
 ### Requirement: 逐 turn 去重
 
-CN 行是 turn 级增量。系统必须按 `turn_id` 在单次扫描合并后的全部 trae-cn 消息上做跨库去重：同一 `turn_id` 出现多次时（无论多行来自同一 DB、不同 DB 的副本，还是缓存命中与冷扫描的混合），保留 `updated_at` 最大的一条。系统不得按 `session_id` 折叠：同一 session 的不同 turn 必须全部保留。
+CN 行是 turn 级增量。系统必须按消息携带的 `turn_id` 在单次扫描合并后的全部 trae-cn 消息上做跨库去重：同一 `turn_id` 出现多次时（无论多行来自同一 DB、不同 DB 的副本，还是缓存命中与冷扫描的混合），保留 `updated_at` 最大的一条。collect 流与 ParsedMessage 流两条业务流程都必须在各自合并后的消息上执行该去重。系统不得按 `session_id` 折叠：同一 session 的不同 turn 必须全部保留，即使两条消息除 turn 身份外其余字段全部相同。
+
+去重所依据的 `turn_id` 必须作为可序列化字段随消息走完整条管线——解析输出、消息缓存的序列化持久化、缓存命中路径，直到两条流程的合并点；系统不得在合并点用 session_id、消息时间或载荷相似度推断 turn 身份。`turn_id` 为 NULL、缺失或空字符串的行在解析期跳过，不产出消息。
 
 去重所用的 `updated_at` 必须来自数据库行并随消息走完整条管线（含消息缓存的序列化持久化与缓存命中路径）；不得用消息时间代替——消息时间仍取 `created_at`，二者语义分离。`updated_at` 为非数值（含 NULL）或转毫秒溢出的行照常产出，仅其比较键视为最小。`updated_at` 并列时的裁决必须确定且与发现顺序无关：先取 `created_at` 较大者，仍并列时取（`model_id`、五桶用量、`session_id`）序列化字节序较大者。
 
@@ -224,9 +233,9 @@ CN 行是 turn 级增量。系统必须按 `turn_id` 在单次扫描合并后的
 
 #### Scenario: 跨库重复 turn 在缓存与发现顺序各安排下保留最新且仅计一次
 
-- **GIVEN** 两个 DB 各含同一 `turn_id` 的 completed 行，`updated_at` 分别为 t1 与 t2（t2 晚于 t1），用量不同；四种安排：两库全冷、一冷一热（t2 库为缓存命中）、两库全热、发现顺序与上述互换
-- **WHEN** 系统在四种安排下分别扫描并去重
-- **THEN** 每种安排都只产出 1 条该 turn 的消息，用量取 t2 行，四种安排结果一致
+- **GIVEN** 两个 DB 各含同一 `turn_id` 的 completed 行，`updated_at` 分别为 t1 与 t2（t2 晚于 t1），用量不同；五种安排：两库全冷、一冷一热且新版本（t2）在缓存命中侧、一冷一热且新版本（t2）在冷扫描侧、两库全热、发现顺序与上述互换
+- **WHEN** 系统在五种安排下分别经真实缓存装载路径扫描并去重
+- **THEN** 每种安排都只产出 1 条该 turn 的消息，用量取 t2 行，五种安排结果一致
 
 #### Scenario: updated_at 并列时裁决与顺序无关
 
@@ -239,6 +248,24 @@ CN 行是 turn 级增量。系统必须按 `turn_id` 在单次扫描合并后的
 - **GIVEN** 一行 `updated_at` 为 NULL、其余校验通过，另一同 `turn_id` 行的 `updated_at` 为可用数值
 - **WHEN** 系统去重
 - **THEN** 只产出 1 条，取 `updated_at` 可用的一行；扫描不报错
+
+#### Scenario: 缓存序列化往返保留 turn 身份与更新时间
+
+- **GIVEN** 一行 completed turn 经解析产出携带 `turn_id` 与 `updated_at_ms` 的消息，并经消息缓存持久化
+- **WHEN** 下次扫描从缓存装载该消息
+- **THEN** 装载得到的 `turn_id` 与 `updated_at_ms` 和解析原始输出逐字段一致，后续跨库去重按该身份分组
+
+#### Scenario: 同一 session 两个不同 turn 其余字段全部相同仍保留两条
+
+- **GIVEN** 同一 `session_id` 下两个不同 `turn_id` 的 completed 行，模型、五桶用量、`created_at`、`updated_at` 等其余字段全部相同，分属两个 DB
+- **WHEN** 系统在任意缓存与发现顺序安排下扫描并去重
+- **THEN** 产出 2 条消息，不因其余字段相同而折叠为一条
+
+#### Scenario: 两条流程合并后均执行去重
+
+- **GIVEN** 两个 DB 含同一 `turn_id` 的不同版本，分别经 collect 流与 ParsedMessage 流扫描
+- **WHEN** 各流程在合并 DB 消息后执行去重
+- **THEN** 两条流程都只产出 1 条该 turn 的最新消息
 
 ### Requirement: 成本归属
 

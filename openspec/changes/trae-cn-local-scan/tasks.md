@@ -37,14 +37,14 @@
 
 ## 6. 逐 turn 解析与归一化
 
-- [ ] 6.1 Write failing tests: `test_normalize_turn_with_cache_split`、`test_skip_total_mismatch_row`、`test_skip_cache_read_exceeds_prompt`、`test_skip_reasoning_exceeds_completion`、`test_skip_negative_cache_read`、`test_strip_dev_suffix`、`test_skip_timestamp_overflow`、`test_session_title_stays_none`。
-- [ ] 6.2 Implement: 行过滤（completed、deleted_at<=0）、五字段非数值/负值跳行、total 对账、`input = prompt - cache_read`、reasoning 拆分、模型名清洗（剥 `__`、小写、`trae-unknown`、256 字节上限）、`created_at` 秒转毫秒（`checked_mul`）、`session_title = None`、跳过计数。
+- [ ] 6.1 Write failing tests: `test_normalize_turn_with_cache_split`、`test_skip_total_mismatch_row`、`test_skip_cache_read_exceeds_prompt`、`test_skip_reasoning_exceeds_completion`、`test_skip_negative_cache_read`、`test_skip_missing_turn_id`、`test_strip_dev_suffix`、`test_skip_timestamp_overflow`、`test_session_title_stays_none`。
+- [ ] 6.2 Implement: 行过滤（completed、deleted_at<=0）、五字段非数值/负值跳行、total 对账、`input = prompt - cache_read`、reasoning 拆分、模型名清洗（剥 `__`、小写、`trae-unknown`、256 字节上限）、`turn_id` 非空校验（NULL/空跳行）并把已过校验的 `turn_id` 填入消息、`created_at` 秒转毫秒（`checked_mul`）、`session_title = None`、跳过计数。
 - [ ] 6.3 Refactor；全套测试保持绿。
 
 ## 7. 逐 turn 去重
 
-- [ ] 7.1 Write failing tests: `test_dedupe_keeps_all_turns_in_session`、`test_dedupe_same_turn_latest_updated_at_wins`、`test_dedupe_cross_db_newest_wins_across_cache_and_order`（全冷/一冷一热/全热/发现顺序互换四安排参数化）、`test_dedupe_updated_at_tie_break_deterministic`、`test_dedupe_missing_updated_at_still_emitted`。
-- [ ] 7.2 Implement: `UnifiedMessage` 新增 `#[serde(default)] pub updated_at_ms: Option<i64>`（CN 解析器从 `chat_turn.updated_at` 秒转毫秒填充，`checked_mul` 溢出或非数值置 `None`；其他客户端不设置，旧缓存条目反序列化自然为 `None`，无需缓存迁移）；`dedupe_trae_cn_turns`（key = `turn_id`，作用域为单次扫描合并后的全部消息，保留 `updated_at` 最大者，缺失视为最小，并列先比 `created_at` 再比载荷序列化字节序；不复用 `dedupe_latest_trae_messages`，CN 行 `dedup_key` 保持 `None`）；两条流程 lane 内在各 DB 消息合并之后调用（D9）。
+- [ ] 7.1 Write failing tests: 直接构造消息向量的单元测试（trae_cn.rs）：`test_dedupe_keeps_all_turns_in_session`、`test_dedupe_same_turn_latest_updated_at_wins`、`test_dedupe_keeps_distinct_turns_with_identical_fields`（同 session 两 turn、其余字段全同，必须保留两条）、`test_dedupe_updated_at_tie_break_deterministic`、`test_dedupe_missing_updated_at_still_emitted`；缓存集成测试（真实装载路径）：`test_cache_roundtrip_preserves_turn_identity_and_updated_at`（message_cache.rs，缓存序列化/反序列化往返后 `turn_id`、`updated_at_ms` 与解析原始输出一致）、`test_dedupe_cross_db_newest_wins_across_cache_and_order`（lib.rs，全冷、一冷一热新版本在热侧、一冷一热新版本在冷侧、全热、发现顺序互换五安排参数化）、`test_dedupe_applies_after_merge_in_both_flows`（lib.rs，collect 流与 ParsedMessage 流各自合并后执行去重，不以手工构造向量替代）。
+- [ ] 7.2 Implement: `UnifiedMessage` 新增 `#[serde(default)] pub turn_id: Option<String>` 与 `#[serde(default)] pub updated_at_ms: Option<i64>`（CN 解析器把已过非空/256 字节校验的 `chat_turn.turn_id` 填入 `turn_id`，从 `chat_turn.updated_at` 秒转毫秒填充 `updated_at_ms`，`checked_mul` 溢出或非数值置 `None`；其他客户端不设置，旧缓存条目反序列化自然为 `None`，无需缓存迁移）；`dedupe_trae_cn_turns`（key = 消息携带的 `turn_id`，作用域为单次扫描合并后的全部消息，保留 `updated_at` 最大者，缺失视为最小，并列先比 `created_at` 再比载荷序列化字节序；合并点不得用 session_id/时间/载荷推断 turn 身份；不复用 `dedupe_latest_trae_messages`，CN 行 `dedup_key` 保持 `None`——该字段被缓存层全局机制读取，见 D7）；两条流程 lane 内在各 DB 消息合并之后调用（D9）。
 - [ ] 7.3 Refactor；全套测试保持绿。
 
 ## 8. 成本归属
