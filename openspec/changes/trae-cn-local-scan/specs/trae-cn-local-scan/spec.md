@@ -267,6 +267,28 @@ CN 行是 turn 级增量。系统必须按消息携带的 `turn_id` 在单次扫
 - **WHEN** 各流程在合并 DB 消息后执行去重
 - **THEN** 两条流程都只产出 1 条该 turn 的最新消息
 
+### Requirement: 消息缓存格式升级兼容
+
+共享 `UnifiedMessage` 因新增去重元数据字段而改变消息缓存二进制布局时，系统必须按既有缓存格式升级模式处理：缓存格式版本必须升级；升级路径必须保留精确的旧版本 wire 布局并显式转换到新布局（新去重字段置空）；既有受支持的旧版本迁移分支必须继续工作。升级读取不得把既有条目当作损坏丢弃（Invalid）或静默重建（Stale）：升级后的条目必须逐条保留原有消息与既有元数据，新去重字段为空，迁移保存后必须可再次热读取。仅存在于缓存中的消息历史（如 Claude 压缩保留历史）必须在升级后保留。
+
+#### Scenario: 旧格式 shard 升级保留消息与元数据
+
+- **GIVEN** 由冻结旧 wire 类型生成的真实 V9 二进制缓存 shard（含多条消息与既有元数据）
+- **WHEN** 新版本读取该 shard，迁移保存后再次热读取
+- **THEN** 每条消息与既有元数据逐字段不变，新去重字段为空，二次读取不重新解析源文件且不出现损坏或重建告警
+
+#### Scenario: 缓存独有历史升级后保留
+
+- **GIVEN** 一个 Claude 缓存条目，其压缩保留历史在源文件中已不存在
+- **WHEN** 缓存格式升级并迁移该条目
+- **THEN** 保留历史消息仍在升级后的缓存中，未因升级被重建丢弃
+
+#### Scenario: 既有旧版本迁移回归且非 CN 客户端保持热
+
+- **GIVEN** 既有受支持的旧格式（V4–V8）shard，其中含 CN 以外客户端的条目
+- **WHEN** 新版本读取并迁移这些 shard
+- **THEN** 迁移成功，这些客户端条目保持缓存命中语义，不触发全量重扫
+
 ### Requirement: 成本归属
 
 系统必须用既有 `PricingService` 为每条 trae-cn 消息估算成本，`cost_source` 为 `Estimated`。provider 提示由 CN 解析器按模型家族映射：`glm` 前缀到 `zai`，`kimi` 前缀到 `moonshotai`，`deepseek` 前缀到 `deepseek`，`minimax` 前缀到 `minimax`，`doubao` 前缀到 `volcengine`。对无第一方上游费率的 5 个模型（`deepseek-v4.1-flash`、`doubao-seed-2-1-turbo`、`kimi-k2.6`、`kimi-k2.7-code`、`minimax-m2.7`），系统必须提供 Tokens Archive 第一方费率，key 采用 `<provider>/<model>` 格式并带来源引注。无法定价的模型，消息成本为 0，所在日期进入 `incomplete_cost_dates`。

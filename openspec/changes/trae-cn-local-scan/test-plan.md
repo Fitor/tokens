@@ -39,6 +39,9 @@
 | specs/trae-cn-local-scan/spec.md → 逐 turn 去重 | updated_at 并列时裁决与顺序无关 | cli/tokens-core/src/sessions/trae_cn.rs (tests) | test_dedupe_updated_at_tie_break_deterministic | 🔴 red |
 | specs/trae-cn-local-scan/spec.md → 逐 turn 去重 | updated_at 为 NULL 的行照常产出 | cli/tokens-core/src/sessions/trae_cn.rs (tests) | test_dedupe_missing_updated_at_still_emitted | 🔴 red |
 | specs/trae-cn-local-scan/spec.md → 逐 turn 去重 | 缓存序列化往返保留 turn 身份与更新时间 | cli/tokens-core/src/message_cache.rs (tests) | test_cache_roundtrip_preserves_turn_identity_and_updated_at | 🔴 red |
+| specs/trae-cn-local-scan/spec.md → 消息缓存格式升级兼容 | 旧格式 shard 升级保留消息与元数据 | cli/tokens-core/src/message_cache.rs (tests) | test_v9_shard_upgrade_preserves_messages_and_metadata | 🔴 red |
+| specs/trae-cn-local-scan/spec.md → 消息缓存格式升级兼容 | 缓存独有历史升级后保留 | cli/tokens-core/src/message_cache.rs (tests) | test_upgrade_preserves_claude_cache_only_history | 🔴 red |
+| specs/trae-cn-local-scan/spec.md → 消息缓存格式升级兼容 | 既有旧版本迁移回归且非 CN 客户端保持热 | cli/tokens-core/src/message_cache.rs (tests) | test_legacy_format_migration_regression_keeps_non_cn_clients_warm | 🔴 red |
 | specs/trae-cn-local-scan/spec.md → 逐 turn 去重 | 跨库重复 turn 在缓存与发现顺序各安排下保留最新且仅计一次 | cli/tokens-core/src/lib.rs (tests) | test_dedupe_cross_db_newest_wins_across_cache_and_order | 🔴 red |
 | specs/trae-cn-local-scan/spec.md → 逐 turn 去重 | 两条流程合并后均执行去重 | cli/tokens-core/src/lib.rs (tests) | test_dedupe_applies_after_merge_in_both_flows | 🔴 red |
 | specs/trae-cn-local-scan/spec.md → 成本归属 | 已覆盖模型直接命中上游数据集 | cli/tokens-core/src/pricing/mod.rs (tests) | test_deepseek_v4_flash_first_party_resolves | 🔴 red |
@@ -61,4 +64,5 @@
 - 缓存命中测试（test_cache_hit_does_not_reemit_bad_page_diag）复用 message_cache 测试的临时目录与 CacheIdentity 重定向模式（`lib.rs` 既有 sqlite lane 测试先例）。
 - `test_submit_default_includes_trae_cn` 与 `test_trae_and_trae_cn_coexist` 走既有聚合器构造路径（fixtures 目录模式同 `tests/common`）。
 - 白名单机械校验挂入 CI 脚本（与 web lint 同层执行）；该场景无 Rust 测试面，理由：`SUPPORTED_CLIENT_TYPES` 是 TS 常量数组，仓库 web 侧无 vitest/jest 测试设施。
+- 缓存升级测试（组内三个 upgrade/migration 测试）的旧格式 fixture 用冻结的旧 wire 类型（既有 `LegacyCachedSourceEntryV*` 及本 change 新增的 V9 wire 类型）序列化生成真实旧格式二进制 shard，不得用新结构自行构造冒充旧格式；覆盖多条消息与既有元数据逐字段不变、迁移保存后热读取、Claude 保留历史（源中已消失）升级后仍在、V4–V8 迁移回归与非 CN 客户端条目保持缓存命中语义。CN 新格式往返与冷/热去重集成验收继续保留。
 - 国际版"既有测试保持通过"的可执行形态：跑 trae 相关既有测试 + 对 `cli/tokens-cli/src/trae.rs`、`cli/tokens-core/src/sessions/trae.rs` 做 `git diff --exit-code`。两者任一失败即该行不绿。
