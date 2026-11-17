@@ -125,6 +125,21 @@ pub enum TraeDbError {
     BadPageHmac { page: u32 },
     #[error("unsupported WAL file: {0}")]
     UnsupportedWal(String),
+    #[error("source files kept changing during snapshot generation (four attempts); skipping this database")]
+    SourceChanged,
+}
+
+/// Decryption outcome for one database.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct DecryptStats {
+    /// Number of pages in the snapshot.
+    pub page_count: u32,
+    /// Pages whose HMAC failed and that were zeroed instead of decrypted.
+    pub bad_pages: u64,
+    /// Valid WAL frames in the committed prefix.
+    pub wal_frames: u32,
+    /// True when a valid commit frame supplied the visible database size.
+    pub wal_committed: bool,
 }
 
 /// A plaintext snapshot produced from one encrypted database.
@@ -132,11 +147,12 @@ pub enum TraeDbError {
 pub struct Snapshot {
     /// Path of the plaintext SQLite file. The caller owns cleanup.
     pub path: PathBuf,
-    /// Number of pages in the snapshot.
-    pub page_count: u32,
-    /// Pages whose HMAC failed and that were zeroed instead of decrypted.
-    pub bad_pages: u64,
+    /// Decryption statistics gathered while building the snapshot.
+    pub stats: DecryptStats,
 }
+
+/// Total snapshot attempts: the initial scan plus three retries.
+const SNAPSHOT_ATTEMPTS: u32 = 4;
 
 /// The raw key TRAE uses for its local database.
 pub fn default_key() -> [u8; 32] {
@@ -217,11 +233,47 @@ const PAGE_SIZE_CANDIDATES: [usize; 8] = [4096, 8192, 16384, 32768, 65536, 2048,
 struct WalView {
     frames: HashMap<u32, u64>,
     db_size: Option<u32>,
+    frames_seen: u32,
 }
 
 /// Decrypt `database.db` and merge the committed WAL frames into a plaintext
 /// snapshot written inside `out_dir`.
+///
+/// The source files are stat-sampled before and after materialization. A change
+/// in either sample discards the snapshot and retries, up to three retries.
 pub fn create_snapshot(db_path: &Path, key: &[u8], out_dir: &Path) -> Result<Snapshot, TraeDbError> {
+    create_snapshot_with_hook(db_path, key, out_dir, |_| {})
+}
+
+/// Test seam: `before_recheck` runs after the snapshot bytes are written and
+/// before the closing stat sample, which is where a racing writer is detected.
+fn create_snapshot_with_hook<F>(
+    db_path: &Path,
+    key: &[u8],
+    out_dir: &Path,
+    mut before_recheck: F,
+) -> Result<Snapshot, TraeDbError>
+where
+    F: FnMut(&Path),
+{
+    for _attempt in 0..SNAPSHOT_ATTEMPTS {
+        let before = SourceStamp::read(db_path)?;
+        let snapshot = materialize_snapshot(db_path, key, out_dir)?;
+        before_recheck(db_path);
+        if SourceStamp::read(db_path)? == before {
+            return Ok(snapshot);
+        }
+        let _ = fs::remove_file(&snapshot.path);
+    }
+    Err(TraeDbError::SourceChanged)
+}
+
+/// Materialize one snapshot without checking whether the source stayed put.
+fn materialize_snapshot(
+    db_path: &Path,
+    key: &[u8],
+    out_dir: &Path,
+) -> Result<Snapshot, TraeDbError> {
     let db = fs::read(db_path)?;
     let page_size = detect_page_size(&db, key)?;
     let kdf_salt: [u8; 16] = db[0..16].try_into().expect("page 1 starts with a 16-byte salt");
@@ -275,9 +327,48 @@ pub fn create_snapshot(db_path: &Path, key: &[u8], out_dir: &Path) -> Result<Sna
     let path = write_snapshot_file(out_dir, &bytes)?;
     Ok(Snapshot {
         path,
-        page_count: final_pages,
-        bad_pages: 0,
+        stats: DecryptStats {
+            page_count: final_pages,
+            bad_pages: 0,
+            wal_frames: wal.as_ref().map_or(0, |view| view.frames_seen),
+            wal_committed: wal.as_ref().is_some_and(|view| view.db_size.is_some()),
+        },
     })
+}
+
+/// Size and mtime of the database and its WAL, sampled around materialization.
+#[derive(Debug, PartialEq, Eq)]
+struct SourceStamp {
+    database: Option<FileStamp>,
+    wal: Option<FileStamp>,
+}
+
+#[derive(Debug, PartialEq, Eq)]
+struct FileStamp {
+    size: u64,
+    modified: Option<std::time::SystemTime>,
+}
+
+impl SourceStamp {
+    fn read(db_path: &Path) -> Result<Self, io::Error> {
+        Ok(Self {
+            database: FileStamp::read(db_path)?,
+            wal: FileStamp::read(&wal_path_for(db_path))?,
+        })
+    }
+}
+
+impl FileStamp {
+    fn read(path: &Path) -> Result<Option<Self>, io::Error> {
+        match fs::metadata(path) {
+            Ok(metadata) => Ok(Some(Self {
+                size: metadata.len(),
+                modified: metadata.modified().ok(),
+            })),
+            Err(err) if err.kind() == io::ErrorKind::NotFound => Ok(None),
+            Err(err) => Err(err),
+        }
+    }
 }
 
 /// The `-wal` sidecar path that belongs to `db_path`.
@@ -428,6 +519,7 @@ fn read_wal(path: &Path, page_size: usize) -> Result<Option<WalView>, TraeDbErro
     let mut pending: Vec<(u32, u64)> = Vec::new();
     let mut frames = HashMap::new();
     let mut db_size = None;
+    let mut frames_seen = 0u32;
     let mut offset = 32u64;
     let mut frame = vec![0u8; frame_len];
 
@@ -448,6 +540,7 @@ fn read_wal(path: &Path, page_size: usize) -> Result<Option<WalView>, TraeDbErro
         }
         let page_no = u32::from_be_bytes(frame[0..4].try_into().expect("4-byte page number"));
         let commit = u32::from_be_bytes(frame[4..8].try_into().expect("4-byte commit field"));
+        frames_seen += 1;
         pending.push((page_no, offset + 24));
         if commit != 0 {
             for (candidate, data_offset) in pending.drain(..) {
@@ -460,7 +553,11 @@ fn read_wal(path: &Path, page_size: usize) -> Result<Option<WalView>, TraeDbErro
         offset += frame_len as u64;
     }
 
-    Ok(Some(WalView { frames, db_size }))
+    Ok(Some(WalView {
+        frames,
+        db_size,
+        frames_seen,
+    }))
 }
 
 /// WAL cumulative checksum over 8-byte word pairs.
@@ -752,7 +849,227 @@ mod tests {
             )
             .unwrap();
         assert_eq!(updated_at, 1_700_000_005, "the WAL copy of turn t1 wins");
-        assert_eq!(snapshot.bad_pages, 0);
+        assert_eq!(snapshot.stats.bad_pages, 0);
+    }
+
+    const WAL_SALT: (u32, u32) = (0x1122_3344, 0x5566_7788);
+    const STALE_SALT: (u32, u32) = (0xdead_beef, 0xfeed_face);
+
+    fn turn_pages(dir: &Path, name: &str, rows: &str) -> Vec<Vec<u8>> {
+        plain_pages(dir, name, &format!("{CHAT_TURN_SCHEMA}{rows}"))
+    }
+
+    fn frame_specs(pages: &[Vec<u8>], commit_last: bool) -> Vec<WalFrameSpec> {
+        pages
+            .iter()
+            .enumerate()
+            .map(|(index, page)| WalFrameSpec {
+                page_no: index as u32 + 1,
+                commit: if commit_last && index + 1 == pages.len() {
+                    pages.len() as u32
+                } else {
+                    0
+                },
+                plain_page: page.clone(),
+                stale_salt: false,
+                break_checksum: false,
+            })
+            .collect()
+    }
+
+    fn write_main_and_wal(
+        dir: &Path,
+        main_pages: &[Vec<u8>],
+        frames: &[WalFrameSpec],
+        key: &[u8; 32],
+        kdf_salt: &[u8; 16],
+    ) -> PathBuf {
+        let wal = build_wal(WAL_SALT, STALE_SALT, frames, key, kdf_salt);
+        write_fixture(dir, main_pages, Some(wal), key, kdf_salt)
+    }
+
+    fn open_snapshot(path: &Path) -> Connection {
+        Connection::open_with_flags(path, OpenFlags::SQLITE_OPEN_READ_ONLY).unwrap()
+    }
+
+    fn row_count(conn: &Connection) -> i64 {
+        conn.query_row("SELECT COUNT(*) FROM chat_turn", [], |row| row.get(0))
+            .unwrap()
+    }
+
+    fn updated_at_of(conn: &Connection, turn_id: &str) -> i64 {
+        conn.query_row(
+            "SELECT updated_at FROM chat_turn WHERE turn_id = ?1",
+            [turn_id],
+            |row| row.get(0),
+        )
+        .unwrap()
+    }
+
+    fn main_rows() -> &'static str {
+        "INSERT INTO chat_turn VALUES ('{}','s1','t1',1700000000,1700000001,'completed',0);"
+    }
+
+    fn updated_rows() -> &'static str {
+        "INSERT INTO chat_turn VALUES ('{}','s1','t1',1700000000,1700000005,'completed',0);
+         INSERT INTO chat_turn VALUES ('{}','s1','t2',1700000100,1700000105,'completed',0);"
+    }
+
+    fn replaced_rows() -> &'static str {
+        "INSERT INTO chat_turn VALUES ('{}','s9','t9',1700000900,1700000909,'completed',0);"
+    }
+
+    #[test]
+    fn test_snapshot_wal_chain_break_takes_prefix() {
+        let dir = tempfile::tempdir().unwrap();
+        let key = default_key();
+        let kdf_salt = test_kdf_salt();
+        let main = turn_pages(dir.path(), "main.db", main_rows());
+        let updated = turn_pages(dir.path(), "updated.db", updated_rows());
+        let replaced = turn_pages(dir.path(), "replaced.db", replaced_rows());
+
+        // Frames 1..2 are committed and valid; frame 3 breaks the checksum chain,
+        // so frames 3.. must be ignored even though frame 4 carries a commit.
+        let mut frames = frame_specs(&updated, true);
+        let mut tail = frame_specs(&replaced, true);
+        tail[0].break_checksum = true;
+        frames.extend(tail);
+
+        let db_path = write_main_and_wal(dir.path(), &main, &frames, &key, &kdf_salt);
+        let snapshot = create_snapshot(&db_path, &key, dir.path()).unwrap();
+
+        let conn = open_snapshot(&snapshot.path);
+        assert_eq!(row_count(&conn), 2, "only the valid committed prefix is merged");
+        assert_eq!(updated_at_of(&conn, "t1"), 1_700_000_005);
+    }
+
+    #[test]
+    fn test_snapshot_wal_stale_frame_salt_takes_valid_prefix() {
+        let dir = tempfile::tempdir().unwrap();
+        let key = default_key();
+        let kdf_salt = test_kdf_salt();
+        let main = turn_pages(dir.path(), "main.db", main_rows());
+        let updated = turn_pages(dir.path(), "updated.db", updated_rows());
+        let replaced = turn_pages(dir.path(), "replaced.db", replaced_rows());
+
+        let mut frames = frame_specs(&updated, true);
+        let mut tail = frame_specs(&replaced, true);
+        for frame in tail.iter_mut() {
+            frame.stale_salt = true;
+        }
+        frames.extend(tail);
+
+        let db_path = write_main_and_wal(dir.path(), &main, &frames, &key, &kdf_salt);
+        let snapshot = create_snapshot(&db_path, &key, dir.path()).unwrap();
+
+        let conn = open_snapshot(&snapshot.path);
+        assert_eq!(row_count(&conn), 2, "reset residue with an old salt is ignored");
+        assert_eq!(updated_at_of(&conn, "t1"), 1_700_000_005);
+    }
+
+    #[test]
+    fn test_snapshot_wal_merges_despite_main_db_salt_difference() {
+        let dir = tempfile::tempdir().unwrap();
+        let key = default_key();
+        let kdf_salt = test_kdf_salt();
+        let main = turn_pages(dir.path(), "main.db", main_rows());
+        let updated = turn_pages(dir.path(), "updated.db", updated_rows());
+
+        let db_path =
+            write_main_and_wal(dir.path(), &main, &frame_specs(&updated, true), &key, &kdf_salt);
+
+        // WAL salts are independent of the SQLCipher key-derivation salt.
+        let wal = fs::read(wal_path_for(&db_path)).unwrap();
+        assert_ne!(
+            wal[16..24],
+            kdf_salt[..8],
+            "the WAL salt carries no equality constraint with the key-derivation salt"
+        );
+
+        let snapshot = create_snapshot(&db_path, &key, dir.path()).unwrap();
+        let conn = open_snapshot(&snapshot.path);
+        assert_eq!(row_count(&conn), 2, "mismatched salts must not drop frames");
+        assert_eq!(updated_at_of(&conn, "t1"), 1_700_000_005);
+    }
+
+    #[test]
+    fn test_snapshot_wal_uncommitted_only_ignored() {
+        let dir = tempfile::tempdir().unwrap();
+        let key = default_key();
+        let kdf_salt = test_kdf_salt();
+        let main = turn_pages(dir.path(), "main.db", main_rows());
+        let updated = turn_pages(dir.path(), "updated.db", updated_rows());
+
+        let frames = frame_specs(&updated, false);
+        assert!(frames.iter().all(|frame| frame.commit == 0));
+
+        let db_path = write_main_and_wal(dir.path(), &main, &frames, &key, &kdf_salt);
+        let snapshot = create_snapshot(&db_path, &key, dir.path()).unwrap();
+
+        let conn = open_snapshot(&snapshot.path);
+        assert_eq!(row_count(&conn), 1, "frames without a commit never apply");
+        assert_eq!(updated_at_of(&conn, "t1"), 1_700_000_001);
+    }
+
+    #[test]
+    fn test_snapshot_truncated_tail_page_count() {
+        let dir = tempfile::tempdir().unwrap();
+        let key = default_key();
+        let kdf_salt = test_kdf_salt();
+        let main = turn_pages(dir.path(), "main.db", updated_rows());
+        assert_eq!(main.len(), 2, "fixture main database spans two pages");
+
+        let db_path = write_fixture(dir.path(), &main, None, &key, &kdf_salt);
+        let truncated_len = (PAGE * 2 + 100) as u64;
+        let file = fs::OpenOptions::new().write(true).open(&db_path).unwrap();
+        file.set_len(truncated_len).unwrap();
+        drop(file);
+
+        let snapshot = create_snapshot(&db_path, &key, dir.path()).unwrap();
+        assert_eq!(
+            snapshot.stats.page_count, 2,
+            "a partial tail page is dropped from the page count"
+        );
+        let conn = open_snapshot(&snapshot.path);
+        assert_eq!(row_count(&conn), 2);
+    }
+
+    #[test]
+    fn test_snapshot_stat_retry_exhausted_skips_db() {
+        let dir = tempfile::tempdir().unwrap();
+        let key = default_key();
+        let kdf_salt = test_kdf_salt();
+        let main = turn_pages(dir.path(), "main.db", main_rows());
+        let db_path = write_fixture(dir.path(), &main, None, &key, &kdf_salt);
+
+        let out_dir = dir.path().join("tmp");
+        let attempts = std::cell::Cell::new(0u32);
+        let err = create_snapshot_with_hook(&db_path, &key, &out_dir, |path| {
+            attempts.set(attempts.get() + 1);
+            let mut file = fs::OpenOptions::new().append(true).open(path).unwrap();
+            file.write_all(&[0u8]).unwrap();
+        })
+        .unwrap_err();
+
+        assert!(matches!(err, TraeDbError::SourceChanged), "got {err:?}");
+        assert_eq!(attempts.get(), 4, "one attempt plus three retries");
+        assert!(
+            !out_dir.exists() || fs::read_dir(&out_dir).unwrap().next().is_none(),
+            "an abandoned attempt must not leave a snapshot behind"
+        );
+    }
+
+    #[test]
+    fn test_snapshot_key_mismatch_skips() {
+        let dir = tempfile::tempdir().unwrap();
+        let key = default_key();
+        let kdf_salt = test_kdf_salt();
+        let main = turn_pages(dir.path(), "main.db", main_rows());
+        let db_path = write_fixture(dir.path(), &main, None, &key, &kdf_salt);
+
+        let wrong_key = [0x5au8; 32];
+        let err = create_snapshot(&db_path, &wrong_key, dir.path()).unwrap_err();
+        assert!(matches!(err, TraeDbError::KeyMismatch), "got {err:?}");
     }
 
     const KAT_FIXTURE: &str = concat!(
@@ -768,8 +1085,8 @@ mod tests {
         let key = default_key();
 
         let snapshot = create_snapshot(&db_path, &key, dir.path()).unwrap();
-        assert_eq!(snapshot.page_count, 11, "the official vector has 11 pages");
-        assert_eq!(snapshot.bad_pages, 0, "every page must pass its HMAC check");
+        assert_eq!(snapshot.stats.page_count, 11, "the official vector has 11 pages");
+        assert_eq!(snapshot.stats.bad_pages, 0, "every page must pass its HMAC check");
 
         let conn = Connection::open_with_flags(&snapshot.path, OpenFlags::SQLITE_OPEN_READ_ONLY)
             .unwrap();

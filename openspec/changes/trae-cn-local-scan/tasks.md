@@ -13,9 +13,9 @@
 
 ## 2. WAL 合并与快照边界
 
-- [ ] 2.1 Write failing tests: `test_snapshot_wal_chain_break_takes_prefix`、`test_snapshot_wal_stale_frame_salt_takes_valid_prefix`、`test_snapshot_wal_merges_despite_main_db_salt_difference`、`test_snapshot_wal_uncommitted_only_ignored`、`test_snapshot_truncated_tail_page_count`、`test_snapshot_stat_retry_exhausted_skips_db`、`test_snapshot_key_mismatch_skips`。
-- [ ] 2.2 Implement: WAL 有效前缀索引（帧有效性 = 帧头 salt 与 WAL 头 salt 一致 + 累计校验链连续，首个失效帧之后全部无效；commit 字段定最后有效提交视图；主库页 1 的 SQLCipher salt 不参与帧判定）、stat 前哨 + 3 次重试 + 跳过告警、页 1 HMAC 预检、截断尾页处理、`DecryptStats` 返回结构。
-- [ ] 2.3 Refactor；全套测试保持绿。
+- [x] 2.1 Write failing tests: `test_snapshot_wal_chain_break_takes_prefix`、`test_snapshot_wal_stale_frame_salt_takes_valid_prefix`、`test_snapshot_wal_merges_despite_main_db_salt_difference`、`test_snapshot_wal_uncommitted_only_ignored`、`test_snapshot_truncated_tail_page_count`、`test_snapshot_stat_retry_exhausted_skips_db`、`test_snapshot_key_mismatch_skips`。
+- [x] 2.2 Implement: WAL 有效前缀索引（帧有效性 = 帧头 salt 与 WAL 头 salt 一致 + 累计校验链连续，首个失效帧之后全部无效；commit 字段定最后有效提交视图；主库页 1 的 SQLCipher salt 不参与帧判定）、stat 前哨 + 3 次重试 + 跳过告警、页 1 HMAC 预检、截断尾页处理、`DecryptStats` 返回结构。
+- [x] 2.3 Refactor；全套测试保持绿。
 
 ## 3. 坏页容忍与明文快照生命周期
 
