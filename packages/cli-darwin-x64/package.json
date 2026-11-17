@@ -1,6 +1,6 @@
 {
   "name": "@fitor/tokens-cli-darwin-x64",
-  "version": "1.0.5",
+  "version": "3.0.0-ci",
   "description": "tokens CLI binary for darwin x64",
   "license": "MIT",
   "type": "module",

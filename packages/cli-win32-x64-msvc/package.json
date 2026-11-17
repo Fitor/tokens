@@ -1,6 +1,6 @@
 {
   "name": "@fitor/tokens-cli-win32-x64-msvc",
-  "version": "1.0.5",
+  "version": "3.0.0-ci",
   "description": "tokens CLI binary for win32 x64 msvc",
   "license": "MIT",
   "type": "module",
