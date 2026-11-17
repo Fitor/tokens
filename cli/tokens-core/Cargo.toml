@@ -29,6 +29,10 @@ rusqlite = { workspace = true }
 zstd = { workspace = true }
 tracing = { workspace = true }
 sha2 = { workspace = true }
+hmac = { workspace = true }
+pbkdf2 = { workspace = true }
+aes = { workspace = true }
+cbc = { workspace = true }
 libc = { workspace = true }
 fs2 = { workspace = true }
 

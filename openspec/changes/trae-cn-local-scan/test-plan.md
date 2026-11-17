@@ -9,7 +9,7 @@
 | specs/trae-cn-local-scan/spec.md → 发现本地 TRAE CN 数据库 | 同一根下两个模块 DB 都被收集 | cli/tokens-core/src/scanner.rs (tests) | test_discover_trae_cn_dbs_collects_all_modules | 🔴 red |
 | specs/trae-cn-local-scan/spec.md → 发现本地 TRAE CN 数据库 | 无权限目录不被静默丢弃 | cli/tokens-core/src/scanner.rs (tests) | test_discover_trae_cn_dbs_eacces_reported | 🔴 red |
 | specs/trae-cn-local-scan/spec.md → 发现本地 TRAE CN 数据库 | 未安装时 lane 为空 | cli/tokens-core/src/scanner.rs (tests) | test_discover_trae_cn_dbs_absent_empty | 🔴 red |
-| specs/trae-cn-local-scan/spec.md → 解密快照 | 加密库解密并产出可查询快照 | cli/tokens-core/src/trae_db.rs (tests) | test_snapshot_decrypts_db_with_committed_wal | 🔴 red |
+| specs/trae-cn-local-scan/spec.md → 解密快照 | 加密库解密并产出可查询快照 | cli/tokens-core/src/trae_db.rs (tests) | test_snapshot_decrypts_db_with_committed_wal | 🟢 green |
 | specs/trae-cn-local-scan/spec.md → 解密快照 | WAL 校验和链中断只取中断点之前 | cli/tokens-core/src/trae_db.rs (tests) | test_snapshot_wal_chain_break_takes_prefix | 🔴 red |
 | specs/trae-cn-local-scan/spec.md → 解密快照 | WAL 帧 salt 与 WAL 头不一致的残留帧不生效 | cli/tokens-core/src/trae_db.rs (tests) | test_snapshot_wal_stale_frame_salt_takes_valid_prefix | 🔴 red |
 | specs/trae-cn-local-scan/spec.md → 解密快照 | WAL salt 与主库 salt 不同仍正常合并 | cli/tokens-core/src/trae_db.rs (tests) | test_snapshot_wal_merges_despite_main_db_salt_difference | 🔴 red |
@@ -17,7 +17,7 @@
 | specs/trae-cn-local-scan/spec.md → 解密快照 | 源文件持续变化时跳过并告警 | cli/tokens-core/src/trae_db.rs (tests) | test_snapshot_stat_retry_exhausted_skips_db | 🔴 red |
 | specs/trae-cn-local-scan/spec.md → 解密快照 | 密钥不匹配时跳过该 DB | cli/tokens-core/src/trae_db.rs (tests) | test_snapshot_key_mismatch_skips | 🔴 red |
 | specs/trae-cn-local-scan/spec.md → 解密快照 | 截断尾页 | cli/tokens-core/src/trae_db.rs (tests) | test_snapshot_truncated_tail_page_count | 🔴 red |
-| specs/trae-cn-local-scan/spec.md → 解密快照 | 已知答案：官方向量可解密且页 HMAC 通过、IV 篡改触发失败 | cli/tokens-core/src/trae_db.rs (tests) | test_kat_official_vector_decrypts_and_hmac_passes | 🔴 red |
+| specs/trae-cn-local-scan/spec.md → 解密快照 | 已知答案：官方向量可解密且页 HMAC 通过、IV 篡改触发失败 | cli/tokens-core/src/trae_db.rs (tests) | test_kat_official_vector_decrypts_and_hmac_passes | 🟢 green |
 | specs/trae-cn-local-scan/spec.md → 坏页容忍与可见性 | 单个坏页不阻断扫描且计数可见 | cli/tokens-core/src/trae_db.rs (tests) | test_bad_page_continues_and_counts | 🔴 red |
 | specs/trae-cn-local-scan/spec.md → 坏页容忍与可见性 | 缓存命中扫描不重发坏页计数 | cli/tokens-core/src/lib.rs (tests) | test_cache_hit_does_not_reemit_bad_page_diag | 🔴 red |
 | specs/trae-cn-local-scan/spec.md → 坏页容忍与可见性 | 置零导致查询失败时跳过该 DB | cli/tokens-core/src/trae_db.rs (tests) | test_zeroed_interior_page_skips_db | 🔴 red |

@@ -4,12 +4,12 @@
 
 ## 1. 解密模块骨架（`trae_db.rs` + fixture 构造器）
 
-- [ ] 1.1 在 `cli/tokens-core/Cargo.toml` 新增 `hmac`、`pbkdf2` 依赖；创建 `trae_db.rs` 模块骨架（SQLCipher 参数文档注释作为权威规格，含 D11 的 WAL 算法规格）。
-- [ ] 1.2 实现合成加密 fixture 构造器（测试模块内）：按 D1 参数加密合成页（含最小 `chat_turn` schema 的明文页）、构造 WAL（已提交/链断裂/帧 salt 与 WAL 头 salt 不匹配的前缀+残留帧/仅未提交/坏页/截断尾页六类；合成 WAL 的头/帧 salt 独立生成，不与主库页 1 salt 相等）。
-- [ ] 1.3 Write failing test: `test_snapshot_decrypts_db_with_committed_wal`（断言先因函数缺失/返回错误失败，即红灯）。
-- [ ] 1.4 Implement: 页解密（kdf salt = 页 1 前 16 字节、hmacKey = PBKDF2-HMAC-SHA512(key, kdf salt XOR `0x3a`, 2 轮, 32 字节)、AES-256-CBC、页 HMAC 校验（输入 = 密文 ‖ IV ‖ LE 页号，页 1 排除前 16 字节 salt 区）、页 1 头回写）使 1.3 转绿。
-- [ ] 1.5 Refactor；全套测试保持绿。
-- [ ] 1.6 已知答案测试（独立于 1.2 的合成构造器）：用官方 SQLCipher 实现生成无用户数据测试向量（空 schema + 若干空表页，二进制 fixture 入仓库，附生成版本与参数：页大小、HMAC/KDF 算法与轮数、密钥形态）；Write failing test `test_kat_official_vector_decrypts_and_hmac_passes`——断言实现可解密该向量且逐页 HMAC 通过，另断言修改向量中任一页 IV 字节后对应页 HMAC 失败；随 1.4 的实现转绿。
+- [x] 1.1 在 `cli/tokens-core/Cargo.toml` 新增 `hmac`、`pbkdf2` 依赖；创建 `trae_db.rs` 模块骨架（SQLCipher 参数文档注释作为权威规格，含 D11 的 WAL 算法规格）。
+- [x] 1.2 实现合成加密 fixture 构造器（测试模块内）：按 D1 参数加密合成页（含最小 `chat_turn` schema 的明文页）、构造 WAL（已提交/链断裂/帧 salt 与 WAL 头 salt 不匹配的前缀+残留帧/仅未提交/坏页/截断尾页六类；合成 WAL 的头/帧 salt 独立生成，不与主库页 1 salt 相等）。
+- [x] 1.3 Write failing test: `test_snapshot_decrypts_db_with_committed_wal`（断言先因函数缺失/返回错误失败，即红灯）。
+- [x] 1.4 Implement: 页解密（kdf salt = 页 1 前 16 字节、hmacKey = PBKDF2-HMAC-SHA512(key, kdf salt XOR `0x3a`, 2 轮, 32 字节)、AES-256-CBC、页 HMAC 校验（输入 = 密文 ‖ IV ‖ LE 页号，页 1 排除前 16 字节 salt 区）、页 1 头回写）使 1.3 转绿。
+- [x] 1.5 Refactor；全套测试保持绿。
+- [x] 1.6 已知答案测试（独立于 1.2 的合成构造器）：用官方 SQLCipher 实现生成无用户数据测试向量（空 schema + 若干空表页，二进制 fixture 入仓库，附生成版本与参数：页大小、HMAC/KDF 算法与轮数、密钥形态）；Write failing test `test_kat_official_vector_decrypts_and_hmac_passes`——断言实现可解密该向量且逐页 HMAC 通过，另断言修改向量中任一页 IV 字节后对应页 HMAC 失败；随 1.4 的实现转绿。
 
 ## 2. WAL 合并与快照边界
 

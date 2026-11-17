@@ -73,12 +73,18 @@ colored = "2"
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 sha2 = "0.10"
+hmac = "0.12"
+pbkdf2 = { version = "0.12", default-features = false, features = ["hmac"] }
 fs2 = "0.4"
 
 # Trae iCubeAuthInfo decryption: AES-128-CBC + base64
 aes = "0.8"
 cbc = { version = "0.1", features = ["std"] }
 base64 = "0.22"
+
+# TRAE CN local SQLCipher decryption: page AES-256-CBC + HMAC-SHA512.
+# `hmac`/`pbkdf2` stay on the 0.12 line: they must share digest 0.10 with the
+# existing `sha2` dependency.
 
 [profile.release]
 # Thin LTO + parallel codegen units keep release builds fast in CI while

@@ -21,6 +21,7 @@ pub mod scanner;
 pub mod sessionize;
 pub mod sessions;
 pub mod speed;
+pub mod trae_db;
 pub mod tui_signal;
 pub mod wiki;
 
