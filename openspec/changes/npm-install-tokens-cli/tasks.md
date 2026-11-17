@@ -59,3 +59,13 @@
 - [x] 6.3 Run: `bunx playwright test tests/e2e/t9-acceptance.spec.ts`。全绿。（13 passed / 0 failed / 0 flaky）
 - [x] 6.4 Run: web `bun run build`。检查 `web/public` 下 pre-install 脚本副本与仓库根一致（design D7）。（build 通过，`diff -q` 两副本一致）
 - [x] 6.5 Run: 全库禁用模式扫描（测试文件除外）。零命中。test-plan 账本回填至全绿。（285 个文件零命中；账本 20/20 行 🟢）
+
+## 7. round 2 审查回归（实现审查发现修复）
+
+- [x] 7.1 Amend: spec R1 场景与 design D5 按 review.md「实现审查」的 PowerShell 兼容性发现修订。settings 命令按查看者平台渲染：POSIX 前缀形态与 Windows `$env:` 单行赋值形态。
+- [x] 7.2 Implement: `SettingsClient.tsx` 三处命令按 `navigator.userAgent` 渲染平台形态，检测不到回退 POSIX。提示在认证与数据加载后渲染，无 hydration 分歧。
+- [x] 7.3 Test: settings e2e 扩展双平台断言。默认上下文（Playwright 桌面 Chromium 固定发 Windows UA）断言 `$env:` 形态；macOS UA 克隆上下文断言 POSIX 形态。
+- [x] 7.4 Fix: 📌 两条滞后注释修正（`scripts/set-version.sh` 两处、`packages/cli/src/index.ts` 两处）。仅注释，无行为变化。
+- [x] 7.5 Run: 全量套件复跑。web `bun test` 全绿；`install-via-npm.test.ts` 全绿；t9 e2e 全文件全绿；web build 通过。
+- [x] 7.6 Round 2 评审返回：`VERDICT: APPROVE`。无 🔴 无 🟡。三条 📌 建议。（评审块已记入 review.md。）
+- [x] 7.7 📌 处理：P1 已采纳，settings e2e 加双向排他断言。P2 已采纳，平台检测改用 `/Windows/`。P3 作者拒绝：cmd.exe 口径与 docs 页 Windows 页签、pre-install-tokens.ps1 一致，属既有生态立场，非本变更引入。作者回应记入 review.md。verify.md 补 round 2 记录后翻转 CHANGES_APPLIED。

@@ -12,10 +12,10 @@ VERSION="${1:?usage: set-version.sh <version>}"
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "${ROOT}"
 
-# Preflight the docs scripts ref advance BEFORE touching any manifest: a
+# Preflight the scripts ref advance BEFORE touching any manifest: a
 # fail-closed exit must not leave versions bumped without the ref moved.
-# A tag without the preinstall scripts must never become the ref — its raw
-# URLs would 404 (v27.0.0/v27.0.1 predate the scripts).
+# The pinned ref lives only in web/src/lib/scriptsRef.ts (design D4); docs
+# carry no raw URLs and no ref values anymore.
 for script in pre-install-tokens.sh pre-install-tokens.ps1; do
   [ -f "${script}" ] || { echo "ERROR: ${script} missing; refusing to advance scripts ref" >&2; exit 1; }
 done
@@ -62,10 +62,9 @@ for (const dir of dirs) {
   console.log(`  ${file} -> ${version}`);
 }
 NODE
-# Docs scripts ref: advance the docs page, manual and READMEs to the
-# v<version> tag about to be created. Raw GitHub URLs resolve as soon as the
-# tag itself is pushed (git push origin v<version>) — the tag carries its
-# commit object, so pushing the branch is not required for the raw ref.
+# Docs scripts ref: advance the pinned ref in web/src/lib/scriptsRef.ts to
+# the v<version> tag about to be created. The docs page derives its manual
+# link from this constant; no doc file carries the ref value (design D4).
 if [ "${CUR_REF}" != "${NEW_REF}" ]; then
   for f in ${REF_FILES}; do
     count=$(grep -cF "${CUR_REF}" "${f}")

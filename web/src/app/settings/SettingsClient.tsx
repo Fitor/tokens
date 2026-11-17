@@ -688,8 +688,16 @@ export default function SettingsClient() {
   const deviceErrorId = useId();
   // CLI hints must point at the deployment actually serving the page; the
   // commands render client-side only (after auth + data load), so
-  // window.location.origin is the deployment origin here.
+  // window.location.origin is the deployment origin here. The shell form
+  // follows the viewer's platform: PowerShell cannot run a POSIX env prefix,
+  // so Windows gets a single-line $env: assignment instead.
   const siteOrigin = typeof window !== "undefined" ? window.location.origin : "";
+  const isWindows =
+    typeof navigator !== "undefined" && /Windows/.test(navigator.userAgent);
+  const siteBound = (command: string) =>
+    isWindows
+      ? `$env:TOKENS_API_URL='${siteOrigin || "<site-origin>"}'; ${command}`
+      : `TOKENS_API_URL=${siteOrigin || "<site-origin>"} ${command}`;
   const [user, setUser] = useState<User | null>(null);
   const [tokens, setTokens] = useState<ApiToken[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -967,7 +975,7 @@ export default function SettingsClient() {
             <CodeText
               style={{ backgroundColor: "var(--muted)" }}
             >
-              {`TOKENS_API_URL=${siteOrigin || "<site-origin>"} tokens login`}
+              {siteBound("tokens login")}
             </CodeText>{" "}
             {t("settings.tokens.descB")}
           </Description>
@@ -1048,7 +1056,7 @@ export default function SettingsClient() {
                 <CodeText
                   style={{ backgroundColor: "var(--muted)" }}
                 >
-                  {`TOKENS_API_URL=${siteOrigin || "<site-origin>"} tokens login`}
+                  {siteBound("tokens login")}
                 </CodeText>{" "}
                 {t("settings.tokens.descB")}
               </EmptyText>
@@ -1123,7 +1131,7 @@ export default function SettingsClient() {
                 <CodeText
                   style={{ backgroundColor: "var(--muted)" }}
                 >
-                  {`TOKENS_API_URL=${siteOrigin || "<site-origin>"} tokens submit`}
+                  {siteBound("tokens submit")}
                 </CodeText>{" "}
                 {t("settings.devices.emptyHintB")}
               </EmptyText>

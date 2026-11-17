@@ -32,3 +32,4 @@
 - 护栏行说明。「tokens 已存在时不要求 npm」「ps1 缺 npm 时中止」「sh 清登录并写 alias」「非法 ref 覆盖回退」。这四行是行为保持护栏。改动前基线即绿，无红阶段，按仓库惯例如实记录差异。改动后必须保持绿。「scriptsRef 缺失时中止」原按护栏登记，实施实测发现基线 `set -e` 下 grep 无匹配静默中止，缺 spec THEN 要求的报错信息（本行「基线即绿」判定有误）。按 🔴→🟢 处理：先写测试确认红灯，再修 `scripts/set-version.sh` 显式报错（grep 无匹配为预期分支，`|| true` 后由显式检查报错退出）转绿。
 - 测试文件把禁用串写成反向断言。「文档与前端源码扫描零命中」的扫描范围不含测试文件。
 - e2e 断言随契约改写：`tests/e2e/t9-acceptance.spec.ts` 的「Docs 页安装入口指向本站」用例改为新契约断言。旧断言（旧 raw 链接可见、`brew install` 排序）删除。
+- round 2 扩展：「settings 提示命令带站点绑定」同时断言 Windows UA（`$env:` 单行形态）与 macOS UA（POSIX 前缀形态，克隆上下文）两种渲染。Playwright 桌面 Chromium 固定发 Windows UA，与宿主 OS 无关，故默认上下文即 Windows 断言面。

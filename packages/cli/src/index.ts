@@ -8,11 +8,12 @@ const binaryName = process.platform === "win32" ? "tokens.exe" : "tokens";
 
 const currentDir = fileURLToPath(new URL(".", import.meta.url));
 const dirName = basename(currentDir);
-// The packages are unscoped, so the platform binaries are siblings of the
-// dispatcher under the same node_modules (no @scope/ directory level).
-// In npm install: currentDir = .../node_modules/tokens-cli/dist/
-//   cliDir = .../node_modules/tokens-cli/
-//   parentDir = .../node_modules/   (siblings: tokens-cli-<platform>/)
+// The platform packages are scoped (@fitor/tokens-cli-<platform>), so the
+// sibling search joins the unscoped suffix under the dispatcher's parent —
+// in an npm install that parent is the @fitor scope directory.
+// In npm install: currentDir = .../node_modules/@fitor/tokens-cli/dist/
+//   cliDir = .../node_modules/@fitor/tokens-cli/
+//   parentDir = .../node_modules/@fitor/   (sibling: tokens-cli-<platform>/, i.e. @fitor/tokens-cli-<platform>/)
 // In monorepo dev (dist): currentDir = .../packages/cli/dist/
 //   cliDir = .../packages/cli/
 //   parentDir = .../packages/
@@ -167,7 +168,7 @@ function resolveRustTargetTriple(): string | null {
 }
 
 // e.g. "cli-darwin-arm64" — the monorepo directory name and the suffix of the
-// unscoped npm package name `tokens-cli-darwin-arm64`.
+// scoped npm package name `@fitor/tokens-cli-darwin-arm64`.
 const targetDir = resolveTargetPackageName();
 const searchPaths: string[] = [];
 

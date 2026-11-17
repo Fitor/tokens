@@ -109,22 +109,52 @@ test("settings 提示命令带站点绑定", async ({ page }) => {
     const response = await page.goto("/settings");
     expect(response?.status()).toBe(200);
 
-    // 两处 tokens login 提示（tokens 区描述 + tokens 空态）都带站点绑定。
-    const loginHints = page
+    // Playwright 桌面 Chromium 固定发 Windows UA（与宿主 OS 无关），默认
+    // 上下文断言 PowerShell 单行赋值形态。
+    const winLoginHints = page
       .getByRole("code")
-      .filter({ hasText: `TOKENS_API_URL=${SITE_ORIGIN} tokens login` });
-    await expect(loginHints.first()).toBeVisible();
-    expect(await loginHints.count()).toBe(2);
-
-    // devices 空态提示：TOKENS_API_URL=<origin> tokens submit。
+      .filter({ hasText: `$env:TOKENS_API_URL='${SITE_ORIGIN}'; tokens login` });
+    await expect(winLoginHints.first()).toBeVisible();
+    expect(await winLoginHints.count()).toBe(2);
     await expect(
       page
         .getByRole("code")
-        .filter({ hasText: `TOKENS_API_URL=${SITE_ORIGIN} tokens submit` })
+        .filter({ hasText: `$env:TOKENS_API_URL='${SITE_ORIGIN}'; tokens submit` })
     ).toBeVisible();
-
-    // 旧上游包引导消失。
     expect(await page.content()).not.toContain("bunx tokens-cli");
+    // 排他性：Windows 视图不渲染 POSIX 前缀形态。
+    expect(await page.content()).not.toContain(
+      `TOKENS_API_URL=${SITE_ORIGIN} tokens`
+    );
+
+    // macOS UA 的克隆上下文断言 POSIX 环境变量前缀形态。
+    const browser = page.context().browser();
+    if (!browser) throw new Error("no browser handle for POSIX-UA context");
+    const posixContext = await browser.newContext({
+      userAgent:
+        "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36",
+    });
+    try {
+      await posixContext.addCookies(await page.context().cookies(SITE_ORIGIN));
+      const posixPage = await posixContext.newPage();
+      const posixResponse = await posixPage.goto("/settings");
+      expect(posixResponse?.status()).toBe(200);
+      const posixLoginHints = posixPage
+        .getByRole("code")
+        .filter({ hasText: `TOKENS_API_URL=${SITE_ORIGIN} tokens login` });
+      await expect(posixLoginHints.first()).toBeVisible();
+      expect(await posixLoginHints.count()).toBe(2);
+      await expect(
+        posixPage
+          .getByRole("code")
+          .filter({ hasText: `TOKENS_API_URL=${SITE_ORIGIN} tokens submit` })
+      ).toBeVisible();
+      expect(await posixPage.content()).not.toContain("bunx tokens-cli");
+      // 排他性：POSIX 视图不渲染 PowerShell 形态。
+      expect(await posixPage.content()).not.toContain("$env:TOKENS_API_URL");
+    } finally {
+      await posixContext.close();
+    }
   } finally {
     await deleteFixtureUsers([user.username]);
   }
