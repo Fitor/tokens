@@ -4,11 +4,11 @@
 
 | Requirement | Scenario | Test File | Test Name | Initial State |
 |-------------|----------|-----------|-----------|---------------|
-| specs/trae-cn-local-scan/spec.md → 发现本地 TRAE CN 数据库 | macOS 标准安装被发现 | cli/tokens-core/src/scanner.rs (tests) | test_discover_trae_cn_dbs_standard_layout | 🔴 red |
-| specs/trae-cn-local-scan/spec.md → 发现本地 TRAE CN 数据库 | 环境变量覆盖扫描根目录 | cli/tokens-core/src/scanner.rs (tests) | test_discover_trae_cn_dbs_env_override | 🔴 red |
-| specs/trae-cn-local-scan/spec.md → 发现本地 TRAE CN 数据库 | 同一根下两个模块 DB 都被收集 | cli/tokens-core/src/scanner.rs (tests) | test_discover_trae_cn_dbs_collects_all_modules | 🔴 red |
-| specs/trae-cn-local-scan/spec.md → 发现本地 TRAE CN 数据库 | 无权限目录不被静默丢弃 | cli/tokens-core/src/scanner.rs (tests) | test_discover_trae_cn_dbs_eacces_reported | 🔴 red |
-| specs/trae-cn-local-scan/spec.md → 发现本地 TRAE CN 数据库 | 未安装时 lane 为空 | cli/tokens-core/src/scanner.rs (tests) | test_discover_trae_cn_dbs_absent_empty | 🔴 red |
+| specs/trae-cn-local-scan/spec.md → 发现本地 TRAE CN 数据库 | macOS 标准安装被发现 | cli/tokens-core/src/scanner.rs (tests) | test_discover_trae_cn_dbs_standard_layout | 🟢 green |
+| specs/trae-cn-local-scan/spec.md → 发现本地 TRAE CN 数据库 | 环境变量覆盖扫描根目录 | cli/tokens-core/src/scanner.rs (tests) | test_discover_trae_cn_dbs_env_override | 🟢 green |
+| specs/trae-cn-local-scan/spec.md → 发现本地 TRAE CN 数据库 | 同一根下两个模块 DB 都被收集 | cli/tokens-core/src/scanner.rs (tests) | test_discover_trae_cn_dbs_collects_all_modules | 🟢 green |
+| specs/trae-cn-local-scan/spec.md → 发现本地 TRAE CN 数据库 | 无权限目录不被静默丢弃 | cli/tokens-core/src/scanner.rs (tests) | test_discover_trae_cn_dbs_eacces_reported | 🟢 green |
+| specs/trae-cn-local-scan/spec.md → 发现本地 TRAE CN 数据库 | 未安装时 lane 为空 | cli/tokens-core/src/scanner.rs (tests) | test_discover_trae_cn_dbs_absent_empty | 🟢 green |
 | specs/trae-cn-local-scan/spec.md → 解密快照 | 加密库解密并产出可查询快照 | cli/tokens-core/src/trae_db.rs (tests) | test_snapshot_decrypts_db_with_committed_wal | 🟢 green |
 | specs/trae-cn-local-scan/spec.md → 解密快照 | WAL 校验和链中断只取中断点之前 | cli/tokens-core/src/trae_db.rs (tests) | test_snapshot_wal_chain_break_takes_prefix | 🟢 green |
 | specs/trae-cn-local-scan/spec.md → 解密快照 | WAL 帧 salt 与 WAL 头不一致的残留帧不生效 | cli/tokens-core/src/trae_db.rs (tests) | test_snapshot_wal_stale_frame_salt_takes_valid_prefix | 🟢 green |

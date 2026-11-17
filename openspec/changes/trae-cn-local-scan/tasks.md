@@ -25,9 +25,9 @@
 
 ## 4. 发现（`scanner.rs`）
 
-- [ ] 4.1 Write failing tests: `test_discover_trae_cn_dbs_standard_layout`、`test_discover_trae_cn_dbs_env_override`、`test_discover_trae_cn_dbs_collects_all_modules`、`test_discover_trae_cn_dbs_eacces_reported`、`test_discover_trae_cn_dbs_absent_empty`。
-- [ ] 4.2 Implement: `ScanResult.trae_cn_dbs` 字段 + 三平台父目录（Windows `%APPDATA%`、macOS `Application Support`、Linux `XDG_CONFIG_HOME`/`~/.config`）+ `TOKENS_TRAE_CN_HOME` 覆盖 + 全模块收集 + EACCES 诊断路径。
-- [ ] 4.3 Refactor；全套测试保持绿。
+- [x] 4.1 Write failing tests: `test_discover_trae_cn_dbs_standard_layout`、`test_discover_trae_cn_dbs_env_override`、`test_discover_trae_cn_dbs_collects_all_modules`、`test_discover_trae_cn_dbs_eacces_reported`、`test_discover_trae_cn_dbs_absent_empty`。
+- [x] 4.2 Implement: `ScanResult.trae_cn_dbs` 字段 + 三平台父目录（Windows `%APPDATA%`、macOS `Application Support`、Linux `XDG_CONFIG_HOME`/`~/.config`）+ `TOKENS_TRAE_CN_HOME` 覆盖 + 全模块收集 + EACCES 诊断路径。
+- [x] 4.3 Refactor；全套测试保持绿。
 
 ## 5. schema 门禁（`sessions/trae_cn.rs`）
 

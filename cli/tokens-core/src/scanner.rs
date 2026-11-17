@@ -127,6 +127,9 @@ pub struct ScanResult {
     /// VS Code Copilot chat session JSONL files discovered under
     /// `workspaceStorage/*/chatSessions/*.jsonl`.
     pub copilot_vscode_sessions: Vec<PathBuf>,
+    /// TRAE CN local SQLCipher databases at
+    /// `{Trae CN, TRAE SOLO CN}/ModularData/{ai-agent, ai-chat}/database.db`.
+    pub trae_cn_dbs: Vec<PathBuf>,
 }
 
 impl Default for ScanResult {
@@ -148,6 +151,7 @@ impl Default for ScanResult {
             opencode_json_dir: None,
             devin_dbs: Vec::new(),
             copilot_vscode_sessions: Vec::new(),
+            trae_cn_dbs: Vec::new(),
         }
     }
 }
@@ -2603,6 +2607,22 @@ fn scan_all_clients_with_env_strategy_inner(
         }
     }
 
+    if include_all || clients.iter().any(|client| client == "trae-cn") {
+        let mut trae_cn_dbs = Vec::new();
+        for parent in trae_cn_scan_parents(home_dir, use_env_roots) {
+            for discovery in discover_trae_cn_databases(&parent) {
+                match discovery {
+                    TraeCnDiscovery::Database(path) => trae_cn_dbs.push(path),
+                    TraeCnDiscovery::Unreadable(path) => tracing::warn!(
+                        path = %path.display(),
+                        "TRAE CN database directory is unreadable; the install is present but skipped"
+                    ),
+                }
+            }
+        }
+        result.trae_cn_dbs = trae_cn_dbs;
+    }
+
     if enabled.contains(&ClientId::OpenClaw) {
         // Every agents root registered above (default, legacy rebrands, extra
         // roots) can hold per-agent SQLite transcript stores. Dedup by
@@ -2967,6 +2987,103 @@ fn prefer_cursor_json_over_csv(files: &mut Vec<PathBuf>) {
     });
 }
 
+/// One TRAE CN database candidate under a platform parent directory.
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
+pub enum TraeCnDiscovery {
+    /// The database file exists and is readable.
+    Database(PathBuf),
+    /// A candidate exists but `stat` was denied, so the directory is present
+    /// yet unreadable. Reported instead of being mistaken for "not installed".
+    Unreadable(PathBuf),
+}
+
+/// TRAE CN product roots under a platform parent directory.
+const TRAE_CN_PRODUCT_ROOTS: [&str; 2] = ["Trae CN", "TRAE SOLO CN"];
+
+/// Module subdirectories that can each hold their own `database.db`.
+const TRAE_CN_MODULES: [&str; 2] = ["ai-agent", "ai-chat"];
+
+/// Platform parent directories that hold TRAE CN installs.
+///
+/// `TOKENS_TRAE_CN_HOME` overrides the parent when env roots are enabled, so a
+/// non-standard install root can be scanned. Empty values count as unset.
+fn trae_cn_scan_parents(home_dir: &str, use_env_roots: bool) -> Vec<PathBuf> {
+    if use_env_roots {
+        if let Some(value) = std::env::var_os("TOKENS_TRAE_CN_HOME") {
+            if !value.is_empty() {
+                return vec![PathBuf::from(value)];
+            }
+        }
+    }
+
+    #[cfg(target_os = "macos")]
+    {
+        vec![PathBuf::from(join_native(
+            home_dir,
+            "Library/Application Support",
+        ))]
+    }
+
+    #[cfg(target_os = "windows")]
+    {
+        if use_env_roots {
+            if let Some(app_data) = std::env::var_os("APPDATA") {
+                if !app_data.is_empty() {
+                    return vec![PathBuf::from(app_data)];
+                }
+            }
+        }
+        vec![PathBuf::from(join_native(home_dir, "AppData/Roaming"))]
+    }
+
+    #[cfg(all(unix, not(target_os = "macos")))]
+    {
+        if use_env_roots {
+            if let Some(xdg) = std::env::var_os("XDG_CONFIG_HOME") {
+                if !xdg.is_empty() {
+                    return vec![PathBuf::from(xdg)];
+                }
+            }
+        }
+        vec![PathBuf::from(join_native(home_dir, ".config"))]
+    }
+
+    #[cfg(not(any(unix, windows)))]
+    {
+        vec![PathBuf::from(join_native(home_dir, ".config"))]
+    }
+}
+
+/// Discover every TRAE CN database under one platform parent directory.
+///
+/// All existing module databases are collected, not just the first one. A
+/// denied `stat` is surfaced as [`TraeCnDiscovery::Unreadable`] so the caller
+/// can warn instead of treating the install as absent.
+fn discover_trae_cn_databases(parent: &Path) -> Vec<TraeCnDiscovery> {
+    let mut found = Vec::new();
+    for root in TRAE_CN_PRODUCT_ROOTS {
+        for module in TRAE_CN_MODULES {
+            let db = parent
+                .join(root)
+                .join("ModularData")
+                .join(module)
+                .join("database.db");
+            match std::fs::metadata(&db) {
+                Ok(metadata) if metadata.is_file() => {
+                    found.push(TraeCnDiscovery::Database(db));
+                }
+                Ok(_) => {}
+                Err(err)
+                    if err.kind() == std::io::ErrorKind::NotFound
+                        || err.kind() == std::io::ErrorKind::NotADirectory => {}
+                Err(_) => found.push(TraeCnDiscovery::Unreadable(db)),
+            }
+        }
+    }
+    found.sort();
+    found
+}
+
 pub fn scan_all_clients(home_dir: &str, clients: &[String]) -> ScanResult {
     scan_all_clients_with_env_strategy(home_dir, clients, true)
 }
@@ -2986,6 +3103,91 @@ mod tests {
         extra.remove("TOKENS_EXTRA_DIRS");
         extra.remove("TOKENS_HEADLESS_DIR");
         scan_all_clients(home_dir, clients)
+    }
+
+    fn trae_cn_db_fixture(parent: &Path, root: &str, module: &str) -> PathBuf {
+        let dir = parent.join(root).join("ModularData").join(module);
+        fs::create_dir_all(&dir).unwrap();
+        let db = dir.join("database.db");
+        fs::write(&db, b"synthetic").unwrap();
+        db
+    }
+
+    #[test]
+    fn test_discover_trae_cn_dbs_standard_layout() {
+        let tmp = TempDir::new().unwrap();
+        let db = trae_cn_db_fixture(tmp.path(), "Trae CN", "ai-agent");
+        assert_eq!(
+            discover_trae_cn_databases(tmp.path()),
+            vec![TraeCnDiscovery::Database(db)]
+        );
+    }
+
+    #[test]
+    #[serial]
+    fn test_discover_trae_cn_dbs_env_override() {
+        let override_root = TempDir::new().unwrap();
+        let home = TempDir::new().unwrap();
+        let db = trae_cn_db_fixture(override_root.path(), "Trae CN", "ai-agent");
+        // The default root holds a DB too; the override must win and hide it.
+        trae_cn_db_fixture(
+            &home.path().join("Library/Application Support"),
+            "Trae CN",
+            "ai-agent",
+        );
+
+        let mut env = EnvGuard::capture(&["TOKENS_TRAE_CN_HOME"]);
+        env.set("TOKENS_TRAE_CN_HOME", override_root.path());
+        let result = scan_all_clients(home.path().to_str().unwrap(), &[]);
+
+        assert_eq!(result.trae_cn_dbs, vec![db]);
+    }
+
+    #[test]
+    fn test_discover_trae_cn_dbs_collects_all_modules() {
+        let tmp = TempDir::new().unwrap();
+        let agent = trae_cn_db_fixture(tmp.path(), "Trae CN", "ai-agent");
+        let chat = trae_cn_db_fixture(tmp.path(), "Trae CN", "ai-chat");
+        let solo = trae_cn_db_fixture(tmp.path(), "TRAE SOLO CN", "ai-agent");
+
+        let found = discover_trae_cn_databases(tmp.path());
+        for expected in [agent, chat, solo] {
+            assert!(
+                found.contains(&TraeCnDiscovery::Database(expected.clone())),
+                "missing {}",
+                expected.display()
+            );
+        }
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn test_discover_trae_cn_dbs_eacces_reported() {
+        use std::os::unix::fs::PermissionsExt;
+
+        // Root ignores mode 000, so the fixture cannot provoke EACCES.
+        if unsafe { libc::geteuid() } == 0 {
+            return;
+        }
+
+        let tmp = TempDir::new().unwrap();
+        let db = trae_cn_db_fixture(tmp.path(), "Trae CN", "ai-agent");
+        let module_dir = db.parent().unwrap().to_path_buf();
+        fs::set_permissions(&module_dir, fs::Permissions::from_mode(0o000)).unwrap();
+
+        let found = discover_trae_cn_databases(tmp.path());
+        fs::set_permissions(&module_dir, fs::Permissions::from_mode(0o755)).unwrap();
+
+        assert_eq!(found, vec![TraeCnDiscovery::Unreadable(db)]);
+    }
+
+    #[test]
+    fn test_discover_trae_cn_dbs_absent_empty() {
+        let tmp = TempDir::new().unwrap();
+        assert!(discover_trae_cn_databases(tmp.path()).is_empty());
+        // A TRAE CN root without ModularData is still "not installed".
+        fs::create_dir_all(tmp.path().join("Trae CN")).unwrap();
+        assert!(discover_trae_cn_databases(tmp.path()).is_empty());
     }
 
     fn restore_env(var: &str, previous: Option<String>) {
