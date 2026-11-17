@@ -50,7 +50,7 @@
 | specs/trae-cn-local-scan/spec.md → 成本归属 | Archive 费率对转售商行保持优先 | cli/tokens-core/src/pricing/mod.rs (tests) | test_archive_volcengine_doubao_beats_reseller | 🟢 green |
 | specs/trae-cn-local-scan/spec.md → 成本归属 | 无法定价的模型不谎报成本 | cli/tokens-core/src/lib.rs (tests) | test_unpriced_trae_cn_model_marks_incomplete_date | 🟢 green |
 | specs/trae-cn-local-scan/spec.md → 客户端注册与上报 | 默认提交包含 trae-cn | cli/tokens-core/tests/trae_cn_submit.rs | test_submit_default_includes_trae_cn | 🟢 green |
-| specs/trae-cn-local-scan/spec.md → 客户端注册与上报 | 服务端白名单接受新客户端 | web/src/lib/types.ts（CI 机械校验：`grep '"trae-cn"' web/src/lib/types.ts`） | supported-client-types-contains-trae-cn | N/A — non-executable |
+| specs/trae-cn-local-scan/spec.md → 客户端注册与上报 | 服务端白名单接受新客户端 | web/src/lib/types.ts（CI 机械校验：`grep '"trae-cn"' web/src/lib/types.ts`） | supported-client-types-contains-trae-cn | N/A — non-executable；机械校验已跑（grep 命中） |
 | specs/trae-cn-local-scan/spec.md → 国际版集成不变 | 国际版既有测试保持通过 | cli（`cargo test -p tokens-core trae && cargo test -p tokens-cli trae` + `git diff --exit-code` on 两个冻结文件） | existing_trae_suite_green_and_unmodified | 🟢 green |
 | specs/trae-cn-local-scan/spec.md → 国际版集成不变 | 国际版 ClientDef 条目逐字段不变 | cli/tokens-core/src/clients.rs (tests) | test_trae_clientdef_fields_unchanged | 🟢 green |
 | specs/trae-cn-local-scan/spec.md → 国际版集成不变 | 两个客户端数据并存 | cli/tokens-core/tests/trae_cn_submit.rs | test_trae_and_trae_cn_coexist | 🟢 green |

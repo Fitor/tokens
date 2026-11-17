@@ -69,6 +69,6 @@
 
 ## 12. 端到端验证与收尾
 
-- [ ] 12.1 全套测试：`cargo test -p tokens-core -p tokens-cli` 全绿；CI 机械校验（含白名单 grep）通过。
-- [ ] 12.2 真机 smoke（不入仓库）：对本机 TRAE CN 安装跑一次完整扫描，核对 turn 数与 demo 实测量级一致（~千级/月）、`trae-cn` 消息进入聚合、stderr 无意外告警；结果记入 verify.md。
-- [ ] 12.3 test-plan.md 全部行翻 🟢 green（N/A 行标注机械校验已跑）；运行 `openspec status --change trae-cn-local-scan` 确认规划工件齐备。
+- [x] 12.1 全套测试：`cargo test -p tokens-core -p tokens-cli` 全绿；CI 机械校验（含白名单 grep）通过。
+- [x] 12.2 真机 smoke（不入仓库）：对本机 TRAE CN 安装跑一次完整扫描，核对 turn 数与 demo 实测量级一致（~千级/月）、`trae-cn` 消息进入聚合、stderr 无意外告警；结果记入 verify.md。
+- [x] 12.3 test-plan.md 全部行翻 🟢 green（N/A 行标注机械校验已跑）；运行 `openspec status --change trae-cn-local-scan` 确认规划工件齐备。
