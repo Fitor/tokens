@@ -205,11 +205,11 @@ pub fn parse_turn_row(row: &TraeCnRow<'_>) -> Result<UnifiedMessage, SkipReason>
         cache_write: 0,
         reasoning,
     };
-    // `provider_id` stays empty until the model-family hint maps in task 8.2.
+    let provider_id = provider_hint_for_model(&model_id);
     let mut message = UnifiedMessage::new(
         "trae-cn",
         model_id,
-        "",
+        provider_id,
         row.session_id,
         timestamp,
         tokens,
@@ -269,6 +269,28 @@ fn context_model(context: &serde_json::Value) -> Option<&str> {
         }
         value.as_str()
     })
+}
+
+/// First-party vendor for a TRAE CN model family.
+///
+/// `provider_identity::inferred_provider_from_model` has no `doubao` arm, and
+/// the archived rows are keyed by `<provider>/<model>`, so the CN parser maps
+/// its own families. `canonicalize_provider_segment` lets `zai` and
+/// `volcengine` pass through unchanged.
+fn provider_hint_for_model(model_id: &str) -> &'static str {
+    if model_id.starts_with("glm") {
+        "zai"
+    } else if model_id.starts_with("kimi") {
+        "moonshotai"
+    } else if model_id.starts_with("deepseek") {
+        "deepseek"
+    } else if model_id.starts_with("minimax") {
+        "minimax"
+    } else if model_id.starts_with("doubao") {
+        "volcengine"
+    } else {
+        ""
+    }
 }
 
 /// Strip the `__<channel>` suffix, lower-case the result, and fall back to
@@ -598,6 +620,28 @@ mod tests {
         let context = usage_context(100, 10, 0, 0, 110, "");
         assert_eq!(skip_of(&context, None), SkipReason::MissingTurnId);
         assert_eq!(skip_of(&context, Some("")), SkipReason::MissingTurnId);
+    }
+
+    #[test]
+    fn test_doubao_model_maps_to_volcengine_hint() {
+        for (model, provider) in [
+            ("glm-5.2", "zai"),
+            ("kimi-k2.6", "moonshotai"),
+            ("deepseek-v4.1-flash", "deepseek"),
+            ("minimax-m2.7", "minimax"),
+            ("doubao-seed-2-1-turbo", "volcengine"),
+        ] {
+            let context = usage_context(
+                100,
+                10,
+                0,
+                0,
+                110,
+                &format!(r#","model_name":"{model}""#),
+            );
+            let parsed = parse_turn_row(&row(&context, Some("t1"))).unwrap();
+            assert_eq!(parsed.provider_id, provider, "model {model}");
+        }
     }
 
     #[test]

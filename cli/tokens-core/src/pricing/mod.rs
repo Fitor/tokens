@@ -395,6 +395,34 @@ impl PricingService {
             ("tencent/hy4-preview", 0.834e-6, 2.501e-6, 0.042e-6, None),
             ("hunyuan/hy3", 0.132e-6, 0.528e-6, 0.033e-6, None),
             ("hunyuan/hy4-preview", 0.834e-6, 2.501e-6, 0.042e-6, None),
+            // TRAE CN first-party rows. The CN parser records model families
+            // without a provider, maps each family to its vendor, and none of
+            // the live upstream datasets carries a first-party row for these
+            // ids -- only reseller keys -- so without these rows every CN
+            // session would land in `incomplete_cost_dates`. Rates are USD per
+            // token; cache write is `None` everywhere because none of the five
+            // publishes a per-token cache-write tariff. Verified 2026-11-17.
+            //
+            // DeepSeek V4.1 Flash: peak cache-miss $0.30 in / $1.20 out,
+            // cache hit $0.006 per 1M; off-peak halves both. The archive holds
+            // one rate per model, so it stores the peak list rate.
+            // https://api-docs.deepseek.com/quick_start/pricing
+            ("deepseek/deepseek-v4.1-flash", 0.30e-6, 1.20e-6, 0.006e-6, None),
+            // Doubao Seed 2.1 Turbo, listed by ByteDance as
+            // `dola-seed-2-1-turbo` on BytePlus ModelArk: $0.50 in / $2.50 out,
+            // $0.10 cached input. Cache storage bills per hour, not per token.
+            // https://docs.byteplus.com/docs/en/modelark/model-pricing
+            ("volcengine/doubao-seed-2-1-turbo", 0.5e-6, 2.5e-6, 0.1e-6, None),
+            // Kimi K2.6 and K2.7 Code: $0.95 in / $4.00 out per 1M; cached
+            // input $0.16 (K2.6) and $0.19 (K2.7 Code).
+            // https://platform.kimi.ai/docs/pricing/chat
+            ("moonshotai/kimi-k2.6", 0.95e-6, 4.0e-6, 0.16e-6, None),
+            ("moonshotai/kimi-k2.7-code", 0.95e-6, 4.0e-6, 0.19e-6, None),
+            // MiniMax M2.7: $0.30 in / $1.20 out, $0.06 cached input. The
+            // model retires 2026-11-18, but existing installs keep reporting
+            // it, so its last published rate stays archived.
+            // https://platform.minimax.io/docs/pricing/overview
+            ("minimax/minimax-m2.7", 0.30e-6, 1.20e-6, 0.06e-6, None),
         ];
 
         let mut overrides = HashMap::with_capacity(entries.len());
@@ -2907,6 +2935,56 @@ mod tests {
     /// for an unverified upstream hit, so the marketplace row that prices
     /// `mimo-v2.5-pro` was already gone by the time the filter saw the source,
     /// and merely ADDING an archive row dropped every MiMo Code session to $0.
+    #[test]
+    fn test_deepseek_v4_flash_first_party_resolves() {
+        let service = PricingService::new(HashMap::new(), HashMap::new());
+        let usage = TokenBreakdown {
+            input: 1_000_000,
+            output: 1_000_000,
+            cache_read: 1_000_000,
+            cache_write: 0,
+            reasoning: 0,
+        };
+
+        let resolved = service
+            .resolve_for_usage_with_provider("deepseek-v4.1-flash", Some("deepseek"), &usage)
+            .expect("deepseek-v4.1-flash must resolve first-party");
+        assert_eq!(resolved.source, "Tokens Archive");
+        assert_eq!(resolved.matched_key, "deepseek/deepseek-v4.1-flash");
+        assert!(
+            service.calculate_cost_with_provider("deepseek-v4.1-flash", Some("deepseek"), &usage)
+                > 0.0
+        );
+    }
+
+    #[test]
+    fn test_archive_volcengine_doubao_beats_reseller() {
+        let mut openrouter = HashMap::new();
+        openrouter.insert(
+            "aihubmix/doubao-seed-2-1-turbo".to_string(),
+            ModelPricing {
+                input_cost_per_token: Some(2.0e-6),
+                output_cost_per_token: Some(8.0e-6),
+                cache_read_input_token_cost: Some(1.0e-6),
+                ..Default::default()
+            },
+        );
+        let service = PricingService::new(HashMap::new(), openrouter);
+        let usage = TokenBreakdown {
+            input: 1_000_000,
+            output: 1_000_000,
+            cache_read: 1_000_000,
+            cache_write: 0,
+            reasoning: 0,
+        };
+
+        let resolved = service
+            .resolve_for_usage_with_provider("doubao-seed-2-1-turbo", Some("volcengine"), &usage)
+            .expect("doubao must resolve");
+        assert_eq!(resolved.source, "Tokens Archive");
+        assert_eq!(resolved.matched_key, "volcengine/doubao-seed-2-1-turbo");
+    }
+
     #[test]
     fn suffix_eroded_sku_keeps_its_live_dataset_price() {
         let mut litellm = HashMap::new();

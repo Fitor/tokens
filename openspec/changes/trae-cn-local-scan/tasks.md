@@ -49,9 +49,9 @@
 
 ## 8. 成本归属
 
-- [ ] 8.1 Write failing tests: `test_deepseek_v4_flash_first_party_resolves`、`test_doubao_model_maps_to_volcengine_hint`、`test_archive_volcengine_doubao_beats_reseller`、`test_unpriced_trae_cn_model_marks_incomplete_date`。
-- [ ] 8.2 Implement: CN 解析器侧模型家族 → provider 提示映射（glm→zai、kimi→moonshotai、deepseek→deepseek、minimax→minimax、doubao→volcengine）；`build_archive_overrides()` 增 5 行 `<provider>/<model>` key（`deepseek/deepseek-v4.1-flash`、`volcengine/doubao-seed-2-1-turbo`、`moonshotai/kimi-k2.6`、`moonshotai/kimi-k2.7-code`、`minimax/minimax-m2.7`），带价目页引注与验证日期；`apply_pricing_if_available` 接线（`Estimated`）。
-- [ ] 8.3 Refactor；全套测试保持绿。
+- [x] 8.1 Write failing tests: `test_deepseek_v4_flash_first_party_resolves`、`test_doubao_model_maps_to_volcengine_hint`、`test_archive_volcengine_doubao_beats_reseller`、`test_unpriced_trae_cn_model_marks_incomplete_date`。
+- [x] 8.2 Implement: CN 解析器侧模型家族 → provider 提示映射（glm→zai、kimi→moonshotai、deepseek→deepseek、minimax→minimax、doubao→volcengine）；`build_archive_overrides()` 增 5 行 `<provider>/<model>` key（`deepseek/deepseek-v4.1-flash`、`volcengine/doubao-seed-2-1-turbo`、`moonshotai/kimi-k2.6`、`moonshotai/kimi-k2.7-code`、`minimax/minimax-m2.7`），带价目页引注与验证日期；`apply_pricing_if_available` 接线（`Estimated`）。
+- [x] 8.3 Refactor；全套测试保持绿。
 
 ## 9. 客户端注册与管线接入
 

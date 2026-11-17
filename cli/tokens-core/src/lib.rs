@@ -15701,6 +15701,36 @@ mod tests {
     }
 
     #[test]
+    fn test_unpriced_trae_cn_model_marks_incomplete_date() {
+        let pricing = pricing::PricingService::new(HashMap::new(), HashMap::new());
+        let mut message = UnifiedMessage::new(
+            "trae-cn",
+            "trae-unknown",
+            "trae",
+            "trae-cn-session",
+            1_736_510_400_000,
+            TokenBreakdown {
+                input: 100,
+                output: 50,
+                ..Default::default()
+            },
+            0.0,
+        );
+        message.turn_id = Some("turn-1".to_string());
+        let date = message.date.clone();
+
+        let (submitted, zeroed, unpriced_usage, incomplete_dates) =
+            prepare_submission_pricing(vec![message], Some(&pricing));
+
+        assert!(submitted.is_empty());
+        assert_eq!(zeroed.len(), 1);
+        assert_eq!(zeroed[0].cost, 0.0);
+        assert_eq!(unpriced_usage.len(), 1);
+        assert_eq!(unpriced_usage[0].model_id, "trae-unknown");
+        assert!(incomplete_dates.contains(&date));
+    }
+
+    #[test]
     fn submission_reports_ambiguous_evidence_from_a_borrowed_bucket_rate() {
         let disputed_cache_row = |cache_read: f64| pricing::ModelPricing {
             input_cost_per_token: Some(1e-6),
