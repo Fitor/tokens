@@ -4,7 +4,7 @@
 
 ### Requirement: 安装命令统一为 npm 包 @fitor/tokens-cli
 
-README.md、README_zh.md、docs/deploy/tokens-cli-usage.md、docs/deploy/tokens-cli-usage.en.md、前端 docs 页与 `/local` 页安装引导中的 CLI 安装命令必须是 `npm i -g @fitor/tokens-cli`。各入口给出的命令必须一致。settings 提示不显示安装命令。settings 提示给出的 `tokens` 命令必须带 `TOKENS_API_URL=<本站源>` 站点绑定。文档不得再引导使用者走 brew 配方、站点 `install.sh`、`s.ee/tokens` 或旧上游包 `tokens-cli` 安装 CLI。
+README.md、README_zh.md、docs/deploy/tokens-cli-usage.md、docs/deploy/tokens-cli-usage.en.md、前端 docs 页与 `/local` 页安装引导中的 CLI 安装命令必须是 `npm i -g @fitor/tokens-cli`。各入口给出的命令必须一致。settings 提示不显示安装命令。settings 提示给出的 `tokens` 命令必须带 `TOKENS_API_URL=<本站源>` 站点绑定。settings 命令按查看者平台渲染对应 shell 形态：POSIX 用环境变量前缀，Windows PowerShell 用 `$env:` 赋值。文档不得再引导使用者走 brew 配方、站点 `install.sh`、`s.ee/tokens` 或旧上游包 `tokens-cli` 安装 CLI。
 
 #### Scenario: docs 页各平台页签给出 npm 安装命令
 
@@ -22,7 +22,7 @@ README.md、README_zh.md、docs/deploy/tokens-cli-usage.md、docs/deploy/tokens-
 
 - **GIVEN** 部署完成的站点，settings 页没有任何设备与任何 token
 - **WHEN** 查看 settings 页各提示里的命令文本
-- **THEN** 空态提示的命令文本是 `TOKENS_API_URL=<本站源> tokens submit`。两处 `tokens login` 提示的命令文本是 `TOKENS_API_URL=<本站源> tokens login`。`<本站源>` 等于部署站点 origin。页面不含 `bunx tokens-cli`
+- **THEN** 命令文本按查看者平台渲染。POSIX 平台的空态提示命令文本是 `TOKENS_API_URL=<本站源> tokens submit`，Windows 平台是 `$env:TOKENS_API_URL='<本站源>'; tokens submit`。两处 `tokens login` 提示同样按平台渲染：POSIX 平台是 `TOKENS_API_URL=<本站源> tokens login`，Windows 平台是 `$env:TOKENS_API_URL='<本站源>'; tokens login`。`<本站源>` 等于部署站点 origin。页面不含 `bunx tokens-cli`
 
 #### Scenario: /local 页安装引导显示 npm 命令
 

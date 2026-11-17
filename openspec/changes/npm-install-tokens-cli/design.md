@@ -46,6 +46,7 @@
 
 **D5 settings 提示的命令统一渲染站点绑定。**
 settings 空态提示的命令文本改为 `TOKENS_API_URL=<本站源> tokens submit`。两处 `tokens login` 提示（`settings.tokens.desc` 与 `settings.tokens.emptyHint`）改为 `TOKENS_API_URL=<本站源> tokens login`。`<本站源>` 在客户端组件取 `window.location.origin`。`emptyHintA` / `emptyHintB` 文案键不变，只换命令字符串。旧字符串 `bunx tokens-cli submit` 引导走旧包，弃用。裸 `tokens submit` 会把用量发往上游默认站，弃用。
+命令形态按查看者平台渲染（round 2 修订，来自实现审查的 PowerShell 兼容性发现）。POSIX 用 `TOKENS_API_URL=<本站源> tokens …` 前缀。Windows PowerShell 不解析该前缀，用 `$env:TOKENS_API_URL='<本站源>'; tokens …` 单行赋值。客户端以 `navigator.userAgent` 判定平台，检测不到时回退 POSIX。settings 提示在认证与数据加载后才渲染，平台判定不产生 hydration 分歧。
 
 **D6 测试分两层。**
 站点行为进 Playwright e2e：改写 `tests/e2e/t9-acceptance.spec.ts` 的「Docs 页安装入口指向本站」用例，并在同一文件加 settings 空态断言。脚本与文档契约进新文件 `tests/scripts/install-via-npm.test.ts`，用 `bun test tests/scripts/install-via-npm.test.ts` 定向运行。sh 脚本行为用 stub `npm`、stub `tokens` 与临时 HOME 驱动真实脚本。ps1 行为做机械文本断言（本机无 Windows 环境）。set-version.sh 用合成 fixture 目录跑真实脚本，不碰工作区。fixture 带两个 pre-install 脚本占位、最小 `cli/Cargo.toml` workspace 与 `Cargo.lock`、`packages/` 下一个 package.json。运行环境 PATH 含 cargo 与 node。
@@ -78,4 +79,4 @@ README 的「不要用 `bunx tokens-cli@latest`」警告保留原信息：裸命
 
 ## Open Questions
 
-无。安装形态与包名已由用户裁定。settings 提示命令取 `TOKENS_API_URL=<本站源> tokens submit`，已记入 D5。
+无。安装形态与包名已由用户裁定。settings 提示命令带 `TOKENS_API_URL=<本站源>` 站点绑定，按查看者平台渲染 POSIX 或 Windows PowerShell 形态，已记入 D5。

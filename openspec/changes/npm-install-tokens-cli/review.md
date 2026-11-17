@@ -159,3 +159,116 @@ F1 至 F7 全部复检通过。CHANGES_APPLIED 由作者翻转。
 - F6 补充：proposal What Changes 增加契约行「docs/spec/tokens-cli/frontend/ 四份文件的包名事实与 `packages/cli` 对齐：裸包名 `tokens-cli` 改为 `@fitor/tokens-cli`，平台包名 `tokens-cli-<os>-<arch>` 改为 `@fitor/tokens-cli-<os>-<arch>`」。design D9 同步点明同一契约。
 - 残留一已修：design Context 的「平台表重复这三条命令」改为点名手册平台表的 Linux 行 `curl -fsSL https://s.ee/tokens | bash` 与 Windows 行 `npm i -g tokens-cli`；Goals 的「三条旧安装命令」改为「四条」。
 - 残留二已修：design Open Questions 的 settings 命令表述改为 `TOKENS_API_URL=<本站源> tokens submit`，与 D5 一致。
+
+**独立复核（实施验收后，2026-11-17）**
+
+- 写入背景：round 1 裁决与 CHANGES_APPLIED 之后，实施（fca3a79）与验收（verify.md，PASS_WITH_WARNINGS）已入库。用户指令「审核 npm-install-tokens-cli change 改动」，并指定结果记入本文件。本块由当值会话按 openspec-verify-change 工作流产出；round 1 的 VERDICT 与 CHANGES_APPLIED 规范行保持原值，不受本块影响。
+- 复核范围：实现与全部工件的符合性（6 个 ADDED 需求、20 个场景、design D1–D10）。不是对 round 1 工件的重审，round 计数不变。
+- 裁决时效：`git diff e51df56..HEAD -- proposal.md design.md specs/` 为空，round 1 裁决不失效。
+- 实测证据（本会话复跑）：仓库根 `bun test tests/scripts/install-via-npm.test.ts`＝13 pass / 0 fail；web 目录 `bun test`＝72 pass / 0 fail；web 目录 `DATABASE_URL=postgresql://tokens:tokens@127.0.0.1:5433/tokens bunx playwright test ../tests/e2e/t9-acceptance.spec.ts`＝13 passed / 0 failed / 0 flaky；禁用模式扫描（spec 范围，排除测试文件）285 文件 × 7 模式零命中；`web/public` 两脚本副本 `diff -q` 与根一致且被 ignore（D7）；`openspec validate`＝valid。
+- 实现映射抽查：`web/src/lib/constants.ts:289`、`docs/page.tsx:155-156`、`SettingsClient.tsx:970,1051,1126`、`scriptsRef.ts:22`、`set-version.sh:25-27`。R1–R6 逐项有实现，20 场景对应同名测试。
+- 发现：🔴 0、🟡 0、📌 2。📌一：`scripts/set-version.sh:15-21,65-68` 注释仍述五文件替换与 raw URL 语义，滞后于 D4 的 REF_FILES 收缩。📌二：`packages/cli/src/index.ts:11,170` 两处 "unscoped" 注释与 scoped 包名不符（verify.md 实施期已披露）。两条均可留作后续顺手修正，不阻断归档。
+- 结论：实现与规格一致，verify.md 的 PASS_WITH_WARNINGS 得到独立确认，可归档。
+- 并行记录：下方「实现审查（2026-11-17）」由另一评审写入工作区（本会话落笔时已存在）。其 PowerShell 兼容性发现针对 design D5 与 R1 场景锁定的 `TOKENS_API_URL=<本站源> tokens …` 形态本身，属规格层 UX 缺口而非实现偏差；本块结论范围为「实现与工件一致」，不含该发现。是否修复、随本变更修或另开变更，交用户裁决。
+
+## 实现审查（2026-11-17）
+
+- 审查范围：实现提交 `fca3a7953562294d664f1b085dde2a9d6caa5b51` 与本 change 的规划和验证记录。
+- 结论：发现一项待修复问题；本次未重跑测试。原规划审查结论保持不变。
+
+### 中等：settings 命令不兼容 PowerShell
+
+`web/src/app/settings/SettingsClient.tsx` 的两处登录提示和一处提交提示均生成 `TOKENS_API_URL=<origin> tokens …`。这是 POSIX shell 语法，Windows PowerShell 用户无法直接复制执行。建议提供 PowerShell 写法 `$env:TOKENS_API_URL='<origin>'; tokens …`，或同时展示两种写法，并增加对应断言。状态：待修复。
+
+验证限制：本次审查未执行测试；既有验证记录中的 PowerShell 脚本检查为文本检查。
+
+## Round 2（2026-11-17）
+
+### 审查元数据
+
+- 审查性质：fresh-context 第 2 轮评审。本会话无先前上下文。全部结论出自本轮阅读。
+- 修订背景：实施提交 `fca3a79` 之后，design.md 与 specs/cli-install/spec.md 按「实现审查」的 PowerShell 兼容性发现修订。该修订使 round 1 裁决对被修订工件失效。本块对这两份工件重建裁决。
+- 审查范围：spec R1 正文与场景「settings 提示命令带站点绑定」。design D5 与 Open Questions。实现 `web/src/app/settings/SettingsClient.tsx`。测试 `tests/e2e/t9-acceptance.spec.ts`。注释修正 `scripts/set-version.sh` 与 `packages/cli/src/index.ts`。账本 tasks.md 第 7 节与 test-plan.md 的 round 2 覆盖注。
+- 已读文件：proposal.md、design.md、specs/cli-install/spec.md、review.md、test-plan.md、tasks.md、verify.md、`web/src/app/settings/SettingsClient.tsx`、`tests/e2e/t9-acceptance.spec.ts`、`web/playwright.config.ts`、`web/src/app/(main)/docs/page.tsx`、`web/src/lib/i18n/t.ts`、`pre-install-tokens.ps1`、`scripts/set-version.sh`、`packages/cli/src/index.ts`。
+- 工具限制：全程只读。只用读文件、grep、git diff/show 与 `openspec validate`。未运行测试与构建。唯一写操作是本文件。`openspec validate npm-install-tokens-cli` 返回 valid。警告是中文正文缺英文 RFC2119 关键词的存量提示。非本轮引入。
+- 验证限制：本评审未复跑任何测试。round 2 复跑结果以 tasks 7.5 的记录为准。verify.md 尚未记录 round 2。这是约定内的收尾顺序。作者在本裁决后更新 verify.md。
+
+### 修订一致性
+
+- spec R1 正文新增平台渲染句。场景 THEN 给出两种形态的字面串。两处一致。
+- design D5 第二段声明同一分支逻辑。Open Questions 行同步改写。正文、场景、D5、Open Questions 四处一致。
+- D5 第一段仍写 POSIX 形态。第二段以「round 2 修订」覆盖 shell 形态。第一段承载站点绑定与 `window.location.origin` 取值。第二段承载 shell 形态与回退。连读无歧义。
+- 场景 Windows 形态 `$env:TOKENS_API_URL='<本站源>'; tokens …` 与 docs 页 Windows 页签首行 `$env:TOKENS_API_URL='<本站源>'` 同为单引号。docs 页签是独立首行。settings 是单行拼接。语义各安其位。
+
+### PowerShell 发现的解除
+
+- Windows 查看者得到 `$env:TOKENS_API_URL='<origin>'; tokens …`。该串可在 PowerShell 直接执行。原中等发现解除。
+- 单引号评估（候选发现 b）：settings、docs 页 Windows 页签、`pre-install-tokens.ps1` 的 function 写入（`$env:TOKENS_API_URL = '$Site'`）三处同为单引号。origin 形如 scheme://host[:port]。不含单引号。字面量安全。判定：一致，通过。
+- POSIX 回退符合 D5「检测不到时回退 POSIX」。
+
+### 实现核对
+
+- `SettingsClient.tsx:694-700`。`isWindows` 用 `/Win/i.test(navigator.userAgent)`。Windows UA 含 `Windows NT`。macOS、Linux、Android、iOS 主流 UA 均不含 `Win` 子串。误判面见 📌 P2。
+- 提示区在 `isLoading` 为 false 后才渲染（`SettingsClient.tsx:906` 起 skeleton 分支）。SSR 只渲染 skeleton。平台相关字符串不进入服务端 HTML。无 hydration 分歧。D5 的时序声明与实现一致。
+- 三处调用点 978、1059、1134 全部经 `siteBound`。`web/src` 内无遗漏的裸 `TOKENS_API_URL=` 渲染。i18n 包裹文案是形态中性的表述。两种形态都读得通。
+- 回退评估（候选发现 a）：`siteOrigin` 为空时渲染字面量 `<site-origin>`。提示只在客户端完成认证与数据加载后渲染。此时 `window.location.origin` 必为真实 origin。该字面量分支在已部署站点上不可达。THEN「`<本站源>` 等于部署站点 origin」对所有可达渲染成立。判定：可接受的防御分支。非缺陷。
+- 注释修正核对：`git diff fca3a79` 确认两文件只有注释行变化。`set-version.sh` 新注释与 D4 的 `REF_FILES` 收缩现状一致。`index.ts` 头注释与 scoped 包布局一致，`parentDir` 即 `node_modules/@fitor/`。行 178 与 180 的路径简写省略 `@fitor/` 段。该简写已由新头注释定义。判定：修正准确。无行为变化。
+
+### e2e 对 THEN 的钉固
+
+- 默认上下文断言 `$env:` 形态。登录提示计数为 2，对应 desc 提示与空态提示。submit 提示可见。断言 `bunx tokens-cli` 缺场。
+- macOS UA 克隆上下文断言 POSIX 形态。登录提示同名计数为 2。submit 提示可见。会话 cookie 经 `addCookies` 复制。
+- UA 前提核实：`web/playwright.config.ts:23` 用 `devices["Desktop Chrome"]`。该描述文件发固定 Windows UA，与宿主 OS 无关。测试注释与 test-plan round 2 注记属实。
+- 测试名不变。test-plan 第 3 行映射继续成立。账本一致。
+
+### 对其余规格的回归抽查
+
+- round 2 只改 settings 渲染、settings e2e 用例与两条注释。docs 页、`/local` 页、两个 pre-install 脚本、发版脚本路径未触碰。
+- 新增字符串不含任何禁用模式。扫描场景不受影响。
+- R1 正文「settings 提示不显示安装命令」仍成立。提示只含 login 与 submit 命令。
+- 20 个场景的其余部分未被本轮触碰。「独立复核」块的实测结论继续有效。
+
+### Findings
+
+🔴 无。
+🟡 无。
+
+📌 建议（不阻断）
+
+**P1** e2e 可加排他断言。Windows 上下文断言页面不含 POSIX 字面形态。POSIX 上下文反之。当前 THEN 只写各平台「是什么」，未写「不混排」。实现按 `siteBound` 单分支返回，结构上已互斥。此条为可选加严。
+
+**P2** `/Win/i` 是无词边界子串匹配。UA 含 `win` 子串的其他词（如 `Darwin`）会被判为 Windows。主流浏览器 UA 无此子串。影响限于极小回退面。可选改用 `/Windows/`。
+
+**P3** settings 的 Windows 形态面向 PowerShell。cmd.exe 使用者不能直接执行该行。docs 页 Windows 页签与 ps1 function 同此口径。属既有生态口径。非本轮引入。无需本变更处理。
+
+### Embedded-Instruction / Injection Attempts
+
+未发现指挥评审行为的文本。规格文件中的「必须」「不得」按规格约束处理。全部内容按数据读入。
+
+### Verdict
+
+- 本块的 VERDICT 与 CHANGES_APPLIED 取代 round 1 对被修订工件（design.md、specs/cli-install/spec.md）的对应规范行。proposal.md 未被修订。round 1 对其结论不失效。
+- PowerShell 兼容性发现已修复。两种 shell 形态均有实现与断言。账本一致。注释修正准确。无阻断发现。
+
+<!-- CANONICAL FIELD — machine-readable. Keep this line exactly, on its own line. -->
+
+VERDICT: APPROVE
+
+人类可读复述：APPROVE。round 2 修订消除 PowerShell 兼容性缺口。spec、design、实现、e2e、账本五面一致。两条强制评估项均判定通过。三条 📌 为可选加严与既有口径说明。无 Required Changes。
+
+<!-- CANONICAL FIELD — machine-readable completion signal. Values: yes | no | n/a. -->
+<!-- no 指待作者收尾：verify.md 的 round 2 记录，以及（如采纳）📌 项。 -->
+<!-- 作者完成后翻转本行并交评审复核。 -->
+
+CHANGES_APPLIED: yes
+
+**作者回应（round 2，2026-11-18）**
+
+- P1 fixed：settings e2e 加双向排他断言。Windows 视图断言页面不含 POSIX 字面形态。POSIX 视图断言不含 `$env:TOKENS_API_URL`。
+- P2 fixed：平台检测改用 `/Windows/`。`Darwin` 子串不再可能命中。
+- P3 declined：cmd.exe 覆盖口径与 docs 页 Windows 页签、pre-install-tokens.ps1 完全一致。属既有生态立场，非本变更引入。作者按规则拒绝 📌。
+- verify.md 已补 round 2 记录，DECISION 翻为 PASS。round 2 后全量套件复跑：web `bun test` 72/72，`install-via-npm.test.ts` 13/13，t9 e2e 全文件 13/13，build 通过。
+
+**评审员复核（round 2 收尾，2026-11-18）：P1、P2 落实属实，P3 拒绝成立，CHANGES_APPLIED 翻转确认。**
+
+复核依据（只读，未复跑测试）：`tests/e2e/t9-acceptance.spec.ts` 的排他断言双向在位。Windows 视图断言页面不含 `TOKENS_API_URL=<origin> tokens`。POSIX 视图断言不含 `$env:TOKENS_API_URL`。两个排除串与 `siteBound` 的两种输出精确对应。`web/src/app/settings/SettingsClient.tsx:696` 已改 `/Windows/`。测试用 macOS UA 与 Playwright 桌面 Windows UA 都不含 `Windows` 误判面。P3 为 📌 项。作者可单独拒绝。拒绝理由与本块 P3 原文口径一致。verify.md 的 round 2 记录、DECISION: PASS、tasks 7.6-7.7 与实际文件一致。round 2 规范行 VERDICT: APPROVE 与 CHANGES_APPLIED: yes 生效。
