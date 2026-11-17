@@ -65,7 +65,7 @@
 
 ## 11. 国际版护栏
 
-- [ ] 11.1 运行 `cargo test -p tokens-core trae && cargo test -p tokens-cli trae`（全绿）+ 对 `cli/tokens-cli/src/trae.rs`、`cli/tokens-core/src/sessions/trae.rs` 执行 `git diff --exit-code`（无改动），确认 test-plan"国际版既有测试保持通过"行满足。
+- [x] 11.1 运行 `cargo test -p tokens-core trae && cargo test -p tokens-cli trae`（全绿）+ 对 `cli/tokens-cli/src/trae.rs`、`cli/tokens-core/src/sessions/trae.rs` 执行 `git diff --exit-code`（无改动），确认 test-plan"国际版既有测试保持通过"行满足。
 
 ## 12. 端到端验证与收尾
 
