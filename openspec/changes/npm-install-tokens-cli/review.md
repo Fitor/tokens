@@ -140,7 +140,7 @@ CHANGES_APPLIED: yes
 - P3 accepted：design 新增 D10，README 警告保信息、去禁用串。
 - P4 accepted：design D9 与 proposal Impact 增加 `packages/cli/package.json` 的 `repository.url` 改指 `Fitor/tokens`。
 
-**评审员复核（round 1 Required Changes 复检，2026-01-17）**
+**评审员复核（round 1 Required Changes 复检，2026-11-17）**
 
 - F1 accepted by reviewer：场景 THEN 锁定 `TOKENS_API_URL=<本站源> tokens submit`，origin 取部署站点。design D5 定死 `window.location.origin`。spec.md:7 措辞已与场景一致。两处 `tokens login` 提示已覆盖。RC1 五项全部达标。
 - F2 accepted by reviewer：禁用模式已加 `s.ee/tokens`。手册场景 THEN 已加 `curl -fsSL https://s.ee/tokens | bash` 零命中。proposal 已点名该字符串。sh 脚本文本机械场景已补。RC2 四项全部达标。
@@ -272,3 +272,13 @@ CHANGES_APPLIED: yes
 **评审员复核（round 2 收尾，2026-11-18）：P1、P2 落实属实，P3 拒绝成立，CHANGES_APPLIED 翻转确认。**
 
 复核依据（只读，未复跑测试）：`tests/e2e/t9-acceptance.spec.ts` 的排他断言双向在位。Windows 视图断言页面不含 `TOKENS_API_URL=<origin> tokens`。POSIX 视图断言不含 `$env:TOKENS_API_URL`。两个排除串与 `siteBound` 的两种输出精确对应。`web/src/app/settings/SettingsClient.tsx:696` 已改 `/Windows/`。测试用 macOS UA 与 Playwright 桌面 Windows UA 都不含 `Windows` 误判面。P3 为 📌 项。作者可单独拒绝。拒绝理由与本块 P3 原文口径一致。verify.md 的 round 2 记录、DECISION: PASS、tasks 7.6-7.7 与实际文件一致。round 2 规范行 VERDICT: APPROVE 与 CHANGES_APPLIED: yes 生效。
+
+**独立复跑复核（round 2 收尾后，2026-11-18）**
+
+- 写入背景：用户指令「审查下处理结果」。按 openspec-verify-change 工作流对 round 2 收尾（作者回应、评审员复核、verify 翻 PASS）做独立审查。前一轮收尾复核只读未复跑；本块补上实测背书。
+- 收尾声称核实：P1 排他断言双向在位（`tests/e2e/t9-acceptance.spec.ts:126-128` Windows 视图、`:154` POSIX 视图），排除串与 `SettingsClient.tsx:697-700` 的 `siteBound` 两种输出精确对应。P2 平台检测为 `/Windows/`（`SettingsClient.tsx:695-696`）。P3 拒绝成立：`pre-install-tokens.ps1:75-76` 写 `$PROFILE` function（`$env:TOKENS_API_URL = '$Site'`），docs 页 Windows 页签同 `$env:` 口径，cmd.exe 缺口属既有生态口径，非本变更引入。
+- 本会话独立复跑：仓库根 `bun test tests/scripts/install-via-npm.test.ts`＝13 pass / 0 fail；web 目录 `bun test`＝72 pass / 0 fail；web 目录 `DATABASE_URL=postgresql://tokens:tokens@127.0.0.1:5433/tokens bunx playwright test ../tests/e2e/t9-acceptance.spec.ts`＝13 passed / 0 failed / 0 flaky；web 目录 `bun run build` 通过。禁用模式扫描（spec 范围，排除测试文件）285 文件 × 7 模式零命中，文件数与 verify.md 记录一致。`openspec validate`＝valid，仅中文 RFC2119 存量警告。
+- 裁决时效：HEAD＝fd63667，proposal.md、design.md、specs/ 零后续改动，round 2 裁决不失效。
+- 发现：🔴 0、🟡 0、📌 1（已当场修正）：round 1 复检块日期「2026-01-17」为笔误，已改为 2026-11-17。
+- 边界：ps1 无 Windows 运行环境，PowerShell 形态仍仅文本断言（design Risks 已接受，verify.md 已披露）。`web/public` 两脚本副本 `diff -q` 未复跑（round 2 未触碰两脚本）。
+- 结论：round 2 收尾全部声称属实，实现、账本、验证记录与本块实测一致。无阻断发现，可归档。
