@@ -19,9 +19,9 @@
 
 ## 3. 坏页容忍与明文快照生命周期
 
-- [ ] 3.1 Write failing tests: `test_bad_page_continues_and_counts`、`test_zeroed_interior_page_skips_db`。
-- [ ] 3.2 Implement: 坏页置零 + 计数；查询 `DatabaseCorrupt` → 整库跳过 + 告警；专用临时子目录（`<config_dir>/trae-cn-cache/tmp/`）+ 0600 权限 + pid 文件名 + 基于 fail-alive PID 探测（`trae_db.rs` 内实现，策略同 tokens-cli `process_liveness.rs`）的启动清扫。
-- [ ] 3.3 Refactor；全套测试保持绿。
+- [x] 3.1 Write failing tests: `test_bad_page_continues_and_counts`、`test_zeroed_interior_page_skips_db`。
+- [x] 3.2 Implement: 坏页置零 + 计数；查询 `DatabaseCorrupt` → 整库跳过 + 告警；专用临时子目录（`<config_dir>/trae-cn-cache/tmp/`）+ 0600 权限 + pid 文件名 + 基于 fail-alive PID 探测（`trae_db.rs` 内实现，策略同 tokens-cli `process_liveness.rs`）的启动清扫。
+- [x] 3.3 Refactor；全套测试保持绿。
 
 ## 4. 发现（`scanner.rs`）
 

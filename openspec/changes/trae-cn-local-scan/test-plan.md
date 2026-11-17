@@ -18,9 +18,9 @@
 | specs/trae-cn-local-scan/spec.md → 解密快照 | 密钥不匹配时跳过该 DB | cli/tokens-core/src/trae_db.rs (tests) | test_snapshot_key_mismatch_skips | 🟢 green |
 | specs/trae-cn-local-scan/spec.md → 解密快照 | 截断尾页 | cli/tokens-core/src/trae_db.rs (tests) | test_snapshot_truncated_tail_page_count | 🟢 green |
 | specs/trae-cn-local-scan/spec.md → 解密快照 | 已知答案：官方向量可解密且页 HMAC 通过、IV 篡改触发失败 | cli/tokens-core/src/trae_db.rs (tests) | test_kat_official_vector_decrypts_and_hmac_passes | 🟢 green |
-| specs/trae-cn-local-scan/spec.md → 坏页容忍与可见性 | 单个坏页不阻断扫描且计数可见 | cli/tokens-core/src/trae_db.rs (tests) | test_bad_page_continues_and_counts | 🔴 red |
+| specs/trae-cn-local-scan/spec.md → 坏页容忍与可见性 | 单个坏页不阻断扫描且计数可见 | cli/tokens-core/src/trae_db.rs (tests) | test_bad_page_continues_and_counts | 🟢 green |
 | specs/trae-cn-local-scan/spec.md → 坏页容忍与可见性 | 缓存命中扫描不重发坏页计数 | cli/tokens-core/src/lib.rs (tests) | test_cache_hit_does_not_reemit_bad_page_diag | 🔴 red |
-| specs/trae-cn-local-scan/spec.md → 坏页容忍与可见性 | 置零导致查询失败时跳过该 DB | cli/tokens-core/src/trae_db.rs (tests) | test_zeroed_interior_page_skips_db | 🔴 red |
+| specs/trae-cn-local-scan/spec.md → 坏页容忍与可见性 | 置零导致查询失败时跳过该 DB | cli/tokens-core/src/trae_db.rs (tests) | test_zeroed_interior_page_skips_db | 🟢 green |
 | specs/trae-cn-local-scan/spec.md → schema 门禁 | 同构 DB 正常解析 | cli/tokens-core/src/sessions/trae_cn.rs (tests) | test_schema_gate_passes_isomorphic_db | 🔴 red |
 | specs/trae-cn-local-scan/spec.md → schema 门禁 | 缺列 DB 被跳过且告警 | cli/tokens-core/src/sessions/trae_cn.rs (tests) | test_schema_gate_missing_column_skips_with_warning | 🔴 red |
 | specs/trae-cn-local-scan/spec.md → schema 门禁 | 门禁通过但查询失败时跳过 | cli/tokens-core/src/sessions/trae_cn.rs (tests) | test_schema_gate_query_failure_skips | 🔴 red |

@@ -294,6 +294,7 @@ fn materialize_snapshot(
     };
 
     let mut bytes = Vec::with_capacity(final_pages as usize * page_size);
+    let mut bad_pages = 0u64;
     for page_no in 1..=final_pages {
         let mut page = match (&wal, wal_file.as_mut()) {
             (Some(view), Some(file)) => match view.frames.get(&page_no) {
@@ -309,13 +310,17 @@ fn materialize_snapshot(
 
         match decrypt_page(&mut page, page_no, key, &hmac_key) {
             Ok(()) => {}
-            Err(err) => {
-                return Err(if page_no == 1 {
-                    TraeDbError::KeyMismatch
-                } else {
-                    err
-                })
+            // Page 1 carries the key-derivation salt: a failure there means the
+            // key or format is wrong, so the whole database is skipped.
+            Err(_) if page_no == 1 => return Err(TraeDbError::KeyMismatch),
+            // A damaged interior page cannot be decrypted, but zeroing it keeps
+            // the other pages usable; the parser skips the database only if the
+            // zeroed page breaks the B-tree.
+            Err(TraeDbError::BadPageHmac { .. }) => {
+                page.fill(0);
+                bad_pages += 1;
             }
+            Err(err) => return Err(err),
         }
         if page_no == 1 {
             normalize_page_one(&mut page, final_pages);
@@ -329,7 +334,7 @@ fn materialize_snapshot(
         path,
         stats: DecryptStats {
             page_count: final_pages,
-            bad_pages: 0,
+            bad_pages,
             wal_frames: wal.as_ref().map_or(0, |view| view.frames_seen),
             wal_committed: wal.as_ref().is_some_and(|view| view.db_size.is_some()),
         },
@@ -558,6 +563,127 @@ fn read_wal(path: &Path, page_size: usize) -> Result<Option<WalView>, TraeDbErro
         db_size,
         frames_seen,
     }))
+}
+
+/// Directory that holds in-flight plaintext snapshots.
+///
+/// Lives under the tokens config dir so an isolated `TOKENS_CONFIG_DIR`
+/// profile contains every derived artifact.
+pub fn snapshot_tmp_dir() -> PathBuf {
+    crate::paths::get_config_dir()
+        .join("trae-cn-cache")
+        .join("tmp")
+}
+
+/// Remove snapshot files whose owning process is provably gone.
+///
+/// Returns the number of removed files. A missing directory is not an error.
+/// Only regular files named `trae-snapshot-<pid>-<nanos>` are considered, so
+/// unrelated files and symlinks are left alone.
+pub fn sweep_stale_snapshots(dir: &Path) -> Result<u32, TraeDbError> {
+    let entries = match fs::read_dir(dir) {
+        Ok(entries) => entries,
+        Err(err) if err.kind() == io::ErrorKind::NotFound => return Ok(0),
+        Err(err) => return Err(err.into()),
+    };
+    let mut removed = 0;
+    for entry in entries {
+        let entry = entry?;
+        let Some(owner) = entry.file_name().to_str().and_then(parse_snapshot_owner) else {
+            continue;
+        };
+        let Ok(metadata) = fs::symlink_metadata(entry.path()) else {
+            continue;
+        };
+        if !metadata.file_type().is_file() || pid_is_alive(owner) {
+            continue;
+        }
+        if fs::remove_file(entry.path()).is_ok() {
+            removed += 1;
+        }
+    }
+    Ok(removed)
+}
+
+/// Parse the owning PID out of `trae-snapshot-<pid>-<nanos>`.
+fn parse_snapshot_owner(name: &str) -> Option<u32> {
+    let rest = name.strip_prefix("trae-snapshot-")?;
+    let (pid, nanos) = rest.split_once('-')?;
+    if nanos.is_empty() || !nanos.bytes().all(|byte| byte.is_ascii_digit()) {
+        return None;
+    }
+    pid.parse().ok()
+}
+
+/// Whether `pid` names a running process.
+///
+/// Fail-alive, matching `tokens-cli`'s `process_liveness`: only a positive
+/// "no such process" answer reports death, so an uncertain probe defers the
+/// cleanup instead of deleting a live snapshot.
+fn pid_is_alive(pid: u32) -> bool {
+    if pid == 0 {
+        return false;
+    }
+    imp::pid_is_alive(pid)
+}
+
+#[cfg(unix)]
+mod imp {
+    pub(super) fn pid_is_alive(pid: u32) -> bool {
+        if unsafe { libc::kill(pid as i32, 0) } == 0 {
+            return true;
+        }
+        match std::io::Error::last_os_error().raw_os_error() {
+            // Only ESRCH proves the PID is unused; EPERM proves the opposite
+            // and every other errno says nothing, so both stay alive.
+            Some(libc::ESRCH) => false,
+            _ => true,
+        }
+    }
+}
+
+#[cfg(windows)]
+mod imp {
+    const PROCESS_QUERY_LIMITED_INFORMATION: u32 = 0x1000;
+    /// `OpenProcess` reports this for a PID no process holds.
+    const ERROR_INVALID_PARAMETER: i32 = 87;
+
+    extern "system" {
+        fn OpenProcess(desired_access: u32, inherit_handle: i32, process_id: u32)
+            -> *mut std::ffi::c_void;
+        fn CloseHandle(object: *mut std::ffi::c_void) -> i32;
+    }
+
+    pub(super) fn pid_is_alive(pid: u32) -> bool {
+        let handle = unsafe { OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, 0, pid) };
+        if handle.is_null() {
+            return std::io::Error::last_os_error().raw_os_error()
+                != Some(ERROR_INVALID_PARAMETER);
+        }
+        unsafe {
+            CloseHandle(handle);
+        }
+        true
+    }
+}
+
+#[cfg(not(any(unix, windows)))]
+mod imp {
+    /// No probe available: fail alive so nothing is deleted without proof.
+    pub(super) fn pid_is_alive(_pid: u32) -> bool {
+        true
+    }
+}
+
+/// True when a snapshot query failed because the B-tree is unusable, for
+/// example after a zeroed interior page. The caller must skip the whole
+/// database instead of producing partial rows.
+pub fn is_unusable_snapshot(error: &rusqlite::Error) -> bool {
+    matches!(
+        error,
+        rusqlite::Error::SqliteFailure(inner, _)
+            if inner.code == rusqlite::ErrorCode::DatabaseCorrupt
+    )
 }
 
 /// WAL cumulative checksum over 8-byte word pairs.
@@ -1070,6 +1196,111 @@ mod tests {
         let wrong_key = [0x5au8; 32];
         let err = create_snapshot(&db_path, &wrong_key, dir.path()).unwrap_err();
         assert!(matches!(err, TraeDbError::KeyMismatch), "got {err:?}");
+    }
+
+    fn corrupt_page_hmac(encrypted: &mut [u8], page_no: u32) {
+        let offset = (page_no as usize - 1) * PAGE;
+        let start = if page_no == 1 { 16 } else { 0 };
+        encrypted[offset + start] ^= 0x01;
+    }
+
+    #[test]
+    fn test_bad_page_continues_and_counts() {
+        let dir = tempfile::tempdir().unwrap();
+        let key = default_key();
+        let kdf_salt = test_kdf_salt();
+        let main = turn_pages(dir.path(), "main.db", updated_rows());
+        let db_path = write_fixture(dir.path(), &main, None, &key, &kdf_salt);
+        let mut encrypted = fs::read(&db_path).unwrap();
+        corrupt_page_hmac(&mut encrypted, 2);
+        fs::write(&db_path, &encrypted).unwrap();
+
+        let snapshot = create_snapshot(&db_path, &key, dir.path()).unwrap();
+        assert_eq!(snapshot.stats.bad_pages, 1, "the failed page is zeroed and counted");
+        assert_eq!(snapshot.stats.page_count, 2);
+        assert_eq!(
+            fs::metadata(&snapshot.path).unwrap().len(),
+            (PAGE * 2) as u64,
+            "a bad page must not shrink the snapshot"
+        );
+        let written = fs::read(&snapshot.path).unwrap();
+        assert!(
+            written[PAGE..2 * PAGE].iter().all(|byte| *byte == 0),
+            "the failed page is written as zeros"
+        );
+    }
+
+    #[test]
+    fn test_zeroed_interior_page_skips_db() {
+        let dir = tempfile::tempdir().unwrap();
+        let key = default_key();
+        let kdf_salt = test_kdf_salt();
+        let rows = "INSERT INTO chat_turn
+            SELECT '{\"pad\":\"' || hex(zeroblob(100)) || '\"}', 's1', 't' || x,
+                   1700000000 + x, 1700000000 + x, 'completed', 0
+            FROM (WITH RECURSIVE c(x) AS (SELECT 1 UNION ALL SELECT x + 1 FROM c WHERE x < 2000)
+                  SELECT x FROM c);";
+        let main = turn_pages(dir.path(), "main.db", rows);
+        assert!(main.len() > 10, "fixture must span many pages");
+        let interior = main
+            .iter()
+            .position(|page| page[0] == 5)
+            .expect("fixture must contain an interior table page")
+            + 1;
+
+        let db_path = write_fixture(dir.path(), &main, None, &key, &kdf_salt);
+        let mut encrypted = fs::read(&db_path).unwrap();
+        corrupt_page_hmac(&mut encrypted, interior as u32);
+        fs::write(&db_path, &encrypted).unwrap();
+
+        let snapshot = create_snapshot(&db_path, &key, dir.path()).unwrap();
+        assert_eq!(snapshot.stats.bad_pages, 1);
+
+        let conn = open_snapshot(&snapshot.path);
+        let err = conn
+            .query_row("SELECT COUNT(*) FROM chat_turn", [], |row| row.get::<_, i64>(0))
+            .unwrap_err();
+        assert!(
+            is_unusable_snapshot(&err),
+            "a zeroed interior page must make the whole database skippable, got {err:?}"
+        );
+    }
+
+    #[test]
+    fn test_snapshot_tmp_dir_lives_under_config_dir() {
+        assert_eq!(
+            snapshot_tmp_dir(),
+            crate::paths::get_config_dir()
+                .join("trae-cn-cache")
+                .join("tmp")
+        );
+    }
+
+    #[test]
+    fn test_sweep_removes_only_dead_pid_snapshots() {
+        let dir = tempfile::tempdir().unwrap();
+        let mut child = std::process::Command::new("true").spawn().unwrap();
+        let dead_pid = child.id();
+        child.wait().unwrap();
+
+        let dead = dir.path().join(format!("trae-snapshot-{dead_pid}-1"));
+        let live = dir
+            .path()
+            .join(format!("trae-snapshot-{}-2", std::process::id()));
+        let other = dir.path().join("notes.txt");
+        fs::write(&dead, b"x").unwrap();
+        fs::write(&live, b"x").unwrap();
+        fs::write(&other, b"x").unwrap();
+
+        let removed = sweep_stale_snapshots(dir.path()).unwrap();
+        assert_eq!(removed, 1, "only the dead owner's snapshot is removed");
+        assert!(!dead.exists());
+        assert!(live.exists(), "a live owner's snapshot must survive");
+        assert!(other.exists(), "unrelated files are never touched");
+        assert_eq!(
+            sweep_stale_snapshots(&dir.path().join("missing")).unwrap(),
+            0
+        );
     }
 
     const KAT_FIXTURE: &str = concat!(
