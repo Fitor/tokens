@@ -48,6 +48,7 @@ export const SOURCE_DISPLAY_NAMES: Record<ClientType, string> = {
   "antigravity-cli": "Antigravity CLI",
   zed: "Zed Agent",
   trae: "Trae",
+  "trae-cn": "Trae CN",
   warp: "Warp",
   cline: "Cline",
   synthetic: "Synthetic",
@@ -117,6 +118,8 @@ export const SOURCE_LOGOS: Record<ClientType, string> = {
   "antigravity-cli": `${GITHUB_CDN_BASE}/client-antigravity.png`,
   zed: `${GITHUB_CDN_BASE}/client-zed.webp`,
   trae: `${GITHUB_CDN_BASE}/client-trae.png`,
+  // Same vendor mark as the international client.
+  "trae-cn": `${GITHUB_CDN_BASE}/client-trae.png`,
   warp: `${GITHUB_CDN_BASE}/client-warp.png`,
   cline: `${GITHUB_CDN_BASE}/client-cline.png`,
   synthetic: `${GITHUB_CDN_BASE}/client-synthetic.png`,
@@ -181,6 +184,7 @@ export const SOURCE_COLORS: Record<ClientType, string> = {
   "antigravity-cli": "#6366F1",
   zed: "#084CCF",
   trae: "#00BFA5",
+  "trae-cn": "#00BFA5",
   warp: "#01A4A4",
   cline: "#5B8DEF",
   synthetic: "#4ADE80",
@@ -216,7 +220,7 @@ export const SOURCE_COLORS: Record<ClientType, string> = {
 /**
  * Every client the CLI scans, in display order.
  *
- * Mirrors `define_clients!` in `cli/tokens-core/src/clients.rs` — 54 entries,
+ * Mirrors `define_clients!` in `cli/tokens-core/src/clients.rs` — 55 entries,
  * excluding the two filter-only aliases (`synthetic`, `9router`) that have no
  * scan path of their own. Kept as an explicit list rather than derived from
  * SOURCE_DISPLAY_NAMES, which also carries those aliases and legacy keys.
@@ -271,6 +275,7 @@ export const SUPPORTED_CLIENTS: readonly ClientType[] = [
   "roocode",
   "senpi",
   "trae",
+  "trae-cn",
   "unsloth",
   "warp",
   "workbuddy",

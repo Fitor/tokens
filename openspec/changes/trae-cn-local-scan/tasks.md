@@ -61,7 +61,7 @@
 
 ## 10. web 白名单（机械校验）
 
-- [ ] 10.1 `web/src/lib/types.ts` 的 `SUPPORTED_CLIENT_TYPES` 加入 `"trae-cn"`；运行机械校验 `grep '"trae-cn"' web/src/lib/types.ts` 确认通过（test-plan N/A 行）。
+- [x] 10.1 `web/src/lib/types.ts` 的 `SUPPORTED_CLIENT_TYPES` 加入 `"trae-cn"`；运行机械校验 `grep '"trae-cn"' web/src/lib/types.ts` 确认通过（test-plan N/A 行）。
 
 ## 11. 国际版护栏
 
