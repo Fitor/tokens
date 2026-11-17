@@ -23,6 +23,8 @@
 - 非执行校验：
   - `grep '"trae-cn"' web/src/lib/types.ts` → 命中，通过
   - `npx tsc --noEmit`（web，使用仓库内 `node_modules/.bin/tsc`）→ 仅剩一个既有无关错误：`src/lib/email/send.test.ts(31,72)` 的 `EmailTransport.port`
+  - `bun run lint`（web）→ 0 error / 1 既有 `<img>` warning，exit 0
+  - `bun run build`（web）→ exit 0
   - `cargo test -p tokens-core trae` → 53 passed；`cargo test -p tokens-cli trae` → 32 passed
   - `git diff --exit-code -- cli/tokens-cli/src/trae.rs cli/tokens-core/src/sessions/trae.rs` → exit 0
 - 真机 smoke（数据不入仓库）：
@@ -48,7 +50,7 @@ DECISION: PASS_WITH_WARNINGS
 
 ### 非阻断警告
 
-1. **web 类型检查的既有错误**：`src/lib/email/send.test.ts` 的 `EmailTransport.port` 错误在本 change 之前就存在，本次未触碰该文件；CI 的 Web job 会照旧失败在此处。
+1. **web 类型检查的既有错误**：`src/lib/email/send.test.ts` 的 `EmailTransport.port` 错误在本 change 之前就存在，本次未触碰该文件。它只影响显式的 `tsc --noEmit` 步骤；`next build` 与本 change 相关类型均通过。
 2. **真机数量级无法复现**：本机 TRAE 已裁剪历史（库内仅 15 行），无法用本机数据复现 demo 的约 6,788 turn 总量。改为等价性核对：CLI 的 1,196,573 tokens 与数据库实测完全一致，且 0 坏页、0 跳过告警。demo 的 2.18GB 解密副本是旧快照，不能代表当前安装。
 3. **deepseek 费率取单值**：Archive 每模型仅存一组费率，采用 peak 牌价；off-peak 实际账单约为其一半。已在 `build_archive_overrides()` 注释中写明。
 4. **组 7 范围调整**：用户明确选择 A，把两个流程级去重测试与 lane 内去重调用并入组 9；组 9 已完成，`test-plan` 对应行已翻绿，记录在本地 task.md。
