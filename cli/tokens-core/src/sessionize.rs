@@ -510,6 +510,8 @@ mod tests {
             model_attribution_conflicted: false,
             cache_write_1h: 0,
             inference_speed: None,
+            turn_id: None,
+            updated_at_ms: None,
             duration_ms: None,
         }
     }

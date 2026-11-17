@@ -119,6 +119,17 @@ pub struct UnifiedMessage {
     /// Explicit evidence only; None means unknown, not Standard.
     #[serde(default)]
     pub inference_speed: Option<crate::speed::InferenceSpeed>,
+    /// Source-row turn identity, used to group the incremental rows of one
+    /// turn across databases. Only TRAE CN sets it today: its rows are
+    /// per-turn increments, so `session_id` cannot stand in for it. Other
+    /// clients leave it `None`.
+    #[serde(default)]
+    pub turn_id: Option<String>,
+    /// The source row's `updated_at` in milliseconds, used only to pick the
+    /// newest copy of a `turn_id`. `timestamp` still follows `created_at`, so
+    /// the two never substitute for each other. `None` sorts as the minimum.
+    #[serde(default)]
+    pub updated_at_ms: Option<i64>,
 }
 
 const fn default_message_count() -> i32 {
@@ -399,6 +410,8 @@ impl UnifiedMessage {
             model_attribution_conflicted: false,
             cache_write_1h: 0,
             inference_speed: None,
+            turn_id: None,
+            updated_at_ms: None,
         }
     }
 

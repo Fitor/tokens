@@ -143,23 +143,11 @@ pub enum SkipReason {
     TimestampOutOfRange,
 }
 
-/// One accepted row, ready for cross-database dedupe.
-#[derive(Debug, Clone)]
-pub struct ParsedTurn {
-    pub message: UnifiedMessage,
-    /// Validated `chat_turn.turn_id`. Stored beside the message until the shared
-    /// message layout gains its own field (task 7.2), so no cache format bump is
-    /// needed in between.
-    pub turn_id: String,
-    /// `chat_turn.updated_at` in milliseconds; `None` when missing or overflowing.
-    pub updated_at_ms: Option<i64>,
-}
-
 /// Convert one `chat_turn` row into a message, or the reason it is skipped.
 ///
 /// The database is untrusted input: every rule here either produces a value
 /// backed by the row or skips the row. Nothing is clamped or guessed.
-pub fn parse_turn_row(row: &TraeCnRow<'_>) -> Result<ParsedTurn, SkipReason> {
+pub fn parse_turn_row(row: &TraeCnRow<'_>) -> Result<UnifiedMessage, SkipReason> {
     if row.turn_status != "completed" {
         return Err(SkipReason::NotCompleted);
     }
@@ -218,7 +206,7 @@ pub fn parse_turn_row(row: &TraeCnRow<'_>) -> Result<ParsedTurn, SkipReason> {
         reasoning,
     };
     // `provider_id` stays empty until the model-family hint maps in task 8.2.
-    let message = UnifiedMessage::new(
+    let mut message = UnifiedMessage::new(
         "trae-cn",
         model_id,
         "",
@@ -227,12 +215,9 @@ pub fn parse_turn_row(row: &TraeCnRow<'_>) -> Result<ParsedTurn, SkipReason> {
         tokens,
         0.0,
     );
-
-    Ok(ParsedTurn {
-        message,
-        turn_id: turn_id.to_string(),
-        updated_at_ms,
-    })
+    message.turn_id = Some(turn_id.to_string());
+    message.updated_at_ms = updated_at_ms;
+    Ok(message)
 }
 
 /// One token bucket from `token_usage`.
@@ -303,11 +288,81 @@ fn clean_model_id(raw: Option<&str>) -> String {
     }
 }
 
+/// Collapse duplicate copies of the same turn across databases.
+///
+/// `messages` must already be the merge of every database from one scan. The
+/// winner is the copy with the greatest `updated_at_ms` (missing counts as the
+/// minimum), then the later `timestamp`, then the greater serialized
+/// `(model_id, five buckets, session_id)` payload. A final full-message
+/// comparison keeps the choice independent of discovery order even when every
+/// listed key ties.
+pub fn dedupe_trae_cn_turns(messages: Vec<UnifiedMessage>) -> Vec<UnifiedMessage> {
+    let mut slots: Vec<UnifiedMessage> = Vec::with_capacity(messages.len());
+    let mut position: std::collections::HashMap<String, usize> = std::collections::HashMap::new();
+
+    for message in messages {
+        let Some(turn_id) = message.turn_id.clone() else {
+            // No turn identity means no group to join; keep the row as-is.
+            slots.push(message);
+            continue;
+        };
+        match position.get(&turn_id) {
+            Some(&index) => {
+                if is_newer_turn_copy(&message, &slots[index]) {
+                    slots[index] = message;
+                }
+            }
+            None => {
+                position.insert(turn_id, slots.len());
+                slots.push(message);
+            }
+        }
+    }
+
+    slots
+}
+
+fn is_newer_turn_copy(candidate: &UnifiedMessage, current: &UnifiedMessage) -> bool {
+    match (candidate.updated_at_ms, current.updated_at_ms) {
+        (Some(candidate_ms), Some(current_ms)) if candidate_ms != current_ms => {
+            return candidate_ms > current_ms;
+        }
+        (Some(_), None) => return true,
+        (None, Some(_)) => return false,
+        _ => {}
+    }
+    if candidate.timestamp != current.timestamp {
+        return candidate.timestamp > current.timestamp;
+    }
+    match turn_payload_key(candidate).cmp(&turn_payload_key(current)) {
+        std::cmp::Ordering::Greater => true,
+        std::cmp::Ordering::Less => false,
+        std::cmp::Ordering::Equal => full_message_key(candidate) > full_message_key(current),
+    }
+}
+
+fn turn_payload_key(message: &UnifiedMessage) -> Vec<u8> {
+    bincode::serialize(&(
+        &message.model_id,
+        message.tokens.input,
+        message.tokens.output,
+        message.tokens.cache_read,
+        message.tokens.cache_write,
+        message.tokens.reasoning,
+        &message.session_id,
+    ))
+    .unwrap_or_default()
+}
+
+fn full_message_key(message: &UnifiedMessage) -> Vec<u8> {
+    bincode::serialize(message).unwrap_or_default()
+}
+
 /// Result of parsing one plaintext snapshot.
 #[derive(Debug, Default)]
 pub struct TraeCnParse {
     /// Accepted turns, in database row order.
-    pub turns: Vec<ParsedTurn>,
+    pub messages: Vec<UnifiedMessage>,
     /// Rows rejected by a per-row rule.
     pub skipped: usize,
     /// Set when the whole database was skipped; nothing was parsed.
@@ -386,7 +441,7 @@ pub fn parse_trae_cn_db(path: &Path) -> TraeCnParse {
         };
 
         match parse_turn_row(&raw) {
-            Ok(turn) => parsed.turns.push(turn),
+            Ok(message) => parsed.messages.push(message),
             Err(_) => parsed.skipped += 1,
         }
     }
@@ -485,7 +540,7 @@ mod tests {
         let parsed = parse_turn_row(&row(&context, Some("turn-1"))).unwrap();
 
         assert_eq!(
-            parsed.message.tokens,
+            parsed.tokens,
             crate::TokenBreakdown {
                 input: 200,
                 output: 150,
@@ -494,11 +549,11 @@ mod tests {
                 reasoning: 50,
             }
         );
-        assert_eq!(parsed.message.tokens.total(), 1200);
-        assert_eq!(parsed.message.client, "trae-cn");
-        assert_eq!(parsed.message.model_id, "deepseek-v4.1-flash");
-        assert_eq!(parsed.message.timestamp, 1_700_000_000_000);
-        assert_eq!(parsed.turn_id, "turn-1");
+        assert_eq!(parsed.tokens.total(), 1200);
+        assert_eq!(parsed.client, "trae-cn");
+        assert_eq!(parsed.model_id, "deepseek-v4.1-flash");
+        assert_eq!(parsed.timestamp, 1_700_000_000_000);
+        assert_eq!(parsed.turn_id.as_deref(), Some("turn-1"));
         assert_eq!(parsed.updated_at_ms, Some(1_700_000_005_000));
     }
 
@@ -556,7 +611,7 @@ mod tests {
             r#","model_name":"DeepSeek-V4.1-Flash__dev""#,
         );
         let parsed = parse_turn_row(&row(&context, Some("t1"))).unwrap();
-        assert_eq!(parsed.message.model_id, "deepseek-v4.1-flash");
+        assert_eq!(parsed.model_id, "deepseek-v4.1-flash");
     }
 
     #[test]
@@ -581,7 +636,7 @@ mod tests {
             r#","title":"my secret chat","session_title":"also secret""#,
         );
         let parsed = parse_turn_row(&row(&context, Some("t1"))).unwrap();
-        assert_eq!(parsed.message.session_title, None);
+        assert_eq!(parsed.session_title, None);
     }
 
     #[test]
@@ -595,6 +650,104 @@ mod tests {
         let mut deleted = row(&context, Some("t1"));
         deleted.deleted_at = 1;
         assert_eq!(parse_turn_row(&deleted).unwrap_err(), SkipReason::Deleted);
+    }
+
+    // ---- per-turn dedupe -------------------------------------------------------
+
+    fn turn_message(session: &str, turn: &str, updated_at_ms: Option<i64>) -> UnifiedMessage {
+        let mut message = UnifiedMessage::new(
+            "trae-cn",
+            "glm-5.2",
+            "",
+            session,
+            1_700_000_000_000,
+            crate::TokenBreakdown {
+                input: 10,
+                output: 5,
+                cache_read: 0,
+                cache_write: 0,
+                reasoning: 0,
+            },
+            0.0,
+        );
+        message.turn_id = Some(turn.to_string());
+        message.updated_at_ms = updated_at_ms;
+        message
+    }
+
+    #[test]
+    fn test_dedupe_keeps_all_turns_in_session() {
+        let messages = vec![
+            turn_message("s1", "t1", Some(1)),
+            turn_message("s1", "t2", Some(2)),
+            turn_message("s1", "t3", Some(3)),
+        ];
+        let kept = dedupe_trae_cn_turns(messages);
+        assert_eq!(kept.len(), 3, "a session is never collapsed to one row");
+        let mut turns: Vec<&str> = kept
+            .iter()
+            .filter_map(|message| message.turn_id.as_deref())
+            .collect();
+        turns.sort_unstable();
+        assert_eq!(turns, vec!["t1", "t2", "t3"]);
+    }
+
+    #[test]
+    fn test_dedupe_same_turn_latest_updated_at_wins() {
+        let older = turn_message("s1", "t1", Some(1_000));
+        let mut newer = turn_message("s1", "t1", Some(2_000));
+        newer.tokens.input = 99;
+
+        let kept = dedupe_trae_cn_turns(vec![older, newer]);
+        assert_eq!(kept.len(), 1);
+        assert_eq!(kept[0].updated_at_ms, Some(2_000));
+        assert_eq!(kept[0].tokens.input, 99);
+    }
+
+    #[test]
+    fn test_dedupe_keeps_distinct_turns_with_identical_fields() {
+        let first = turn_message("s1", "t1", Some(5));
+        let second = turn_message("s1", "t2", Some(5));
+
+        let kept = dedupe_trae_cn_turns(vec![first, second]);
+        assert_eq!(
+            kept.len(),
+            2,
+            "identical payloads with different turn ids stay separate"
+        );
+    }
+
+    #[test]
+    fn test_dedupe_updated_at_tie_break_deterministic() {
+        let smaller = turn_message("s1", "t1", Some(5));
+        let mut larger = turn_message("s1", "t1", Some(5));
+        larger.tokens.input = 20;
+
+        let forward = dedupe_trae_cn_turns(vec![smaller.clone(), larger.clone()]);
+        let reversed = dedupe_trae_cn_turns(vec![larger, smaller]);
+        assert_eq!(forward.len(), 1);
+        assert_eq!(reversed.len(), 1);
+        assert_eq!(
+            forward[0].tokens.input, reversed[0].tokens.input,
+            "the tie-break must not depend on discovery order"
+        );
+        assert_eq!(forward[0].tokens.input, 20, "larger serialized payload wins");
+    }
+
+    #[test]
+    fn test_dedupe_missing_updated_at_still_emitted() {
+        // A lone row without updated_at must survive rather than being dropped.
+        let lone = turn_message("s1", "solo", None);
+        assert_eq!(dedupe_trae_cn_turns(vec![lone]).len(), 1);
+
+        // Competing against a usable updated_at, the missing one is the minimum.
+        let missing = turn_message("s1", "t1", None);
+        let mut present = turn_message("s1", "t1", Some(7));
+        present.tokens.input = 42;
+        let kept = dedupe_trae_cn_turns(vec![present, missing]);
+        assert_eq!(kept.len(), 1);
+        assert_eq!(kept[0].updated_at_ms, Some(7));
+        assert_eq!(kept[0].tokens.input, 42);
     }
 
     #[test]
@@ -628,10 +781,10 @@ mod tests {
 
         let parsed = parse_trae_cn_db(&path);
         assert_eq!(parsed.skip_reason, None);
-        assert_eq!(parsed.turns.len(), 1);
-        assert_eq!(parsed.turns[0].turn_id, "t1");
+        assert_eq!(parsed.messages.len(), 1);
+        assert_eq!(parsed.messages[0].turn_id.as_deref(), Some("t1"));
         assert_eq!(parsed.skipped, 2);
-        assert_eq!(parsed.turns[0].message.tokens.total(), 110);
+        assert_eq!(parsed.messages[0].tokens.total(), 110);
     }
 
     #[test]

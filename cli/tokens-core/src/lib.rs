@@ -6588,6 +6588,8 @@ pub fn parsed_to_unified(msg: &ParsedMessage, cost: f64) -> UnifiedMessage {
         model_attribution_conflicted: false,
         cache_write_1h: 0,
         inference_speed: None,
+        turn_id: None,
+        updated_at_ms: None,
     }
 }
 

@@ -33,16 +33,16 @@
 | specs/trae-cn-local-scan/spec.md → 逐 turn 解析与归一化 | 时间戳溢出的行被跳过 | cli/tokens-core/src/sessions/trae_cn.rs (tests) | test_skip_timestamp_overflow | 🟢 green |
 | specs/trae-cn-local-scan/spec.md → 逐 turn 解析与归一化 | session_title 保持为空 | cli/tokens-core/src/sessions/trae_cn.rs (tests) | test_session_title_stays_none | 🟢 green |
 | specs/trae-cn-local-scan/spec.md → 逐 turn 解析与归一化 | turn_id 缺失的行被跳过 | cli/tokens-core/src/sessions/trae_cn.rs (tests) | test_skip_missing_turn_id | 🟢 green |
-| specs/trae-cn-local-scan/spec.md → 逐 turn 去重 | 同一 session 的多个 turn 全部保留 | cli/tokens-core/src/sessions/trae_cn.rs (tests) | test_dedupe_keeps_all_turns_in_session | 🔴 red |
-| specs/trae-cn-local-scan/spec.md → 逐 turn 去重 | 同一 turn 重复出现时取最新 | cli/tokens-core/src/sessions/trae_cn.rs (tests) | test_dedupe_same_turn_latest_updated_at_wins | 🔴 red |
-| specs/trae-cn-local-scan/spec.md → 逐 turn 去重 | 同一 session 两个不同 turn 其余字段全部相同仍保留两条 | cli/tokens-core/src/sessions/trae_cn.rs (tests) | test_dedupe_keeps_distinct_turns_with_identical_fields | 🔴 red |
-| specs/trae-cn-local-scan/spec.md → 逐 turn 去重 | updated_at 并列时裁决与顺序无关 | cli/tokens-core/src/sessions/trae_cn.rs (tests) | test_dedupe_updated_at_tie_break_deterministic | 🔴 red |
-| specs/trae-cn-local-scan/spec.md → 逐 turn 去重 | updated_at 为 NULL 的行照常产出 | cli/tokens-core/src/sessions/trae_cn.rs (tests) | test_dedupe_missing_updated_at_still_emitted | 🔴 red |
-| specs/trae-cn-local-scan/spec.md → 逐 turn 去重 | 缓存序列化往返保留 turn 身份与更新时间 | cli/tokens-core/src/message_cache.rs (tests) | test_cache_roundtrip_preserves_turn_identity_and_updated_at | 🔴 red |
-| specs/trae-cn-local-scan/spec.md → 消息缓存格式升级兼容 | 旧格式 shard 升级保留消息与元数据 | cli/tokens-core/src/message_cache.rs (tests) | test_v9_shard_upgrade_preserves_messages_and_metadata | 🔴 red |
-| specs/trae-cn-local-scan/spec.md → 消息缓存格式升级兼容 | 缓存独有历史升级后保留 | cli/tokens-core/src/message_cache.rs (tests) | test_upgrade_preserves_claude_cache_only_history | 🔴 red |
-| specs/trae-cn-local-scan/spec.md → 消息缓存格式升级兼容 | fork-5/V7/V8 按既有语义迁移且谱系门禁不变 | cli/tokens-core/src/message_cache.rs (tests) | test_fork5_v7_v8_migrations_keep_semantics_and_gates | 🔴 red |
-| specs/trae-cn-local-scan/spec.md → 消息缓存格式升级兼容 | V4/V6 维持 Stale 且 upstream V5 不作为支持输入 | cli/tokens-core/src/message_cache.rs (tests) | test_v4_v6_stale_guard_and_upstream_v5_rejected | 🔴 red |
+| specs/trae-cn-local-scan/spec.md → 逐 turn 去重 | 同一 session 的多个 turn 全部保留 | cli/tokens-core/src/sessions/trae_cn.rs (tests) | test_dedupe_keeps_all_turns_in_session | 🟢 green |
+| specs/trae-cn-local-scan/spec.md → 逐 turn 去重 | 同一 turn 重复出现时取最新 | cli/tokens-core/src/sessions/trae_cn.rs (tests) | test_dedupe_same_turn_latest_updated_at_wins | 🟢 green |
+| specs/trae-cn-local-scan/spec.md → 逐 turn 去重 | 同一 session 两个不同 turn 其余字段全部相同仍保留两条 | cli/tokens-core/src/sessions/trae_cn.rs (tests) | test_dedupe_keeps_distinct_turns_with_identical_fields | 🟢 green |
+| specs/trae-cn-local-scan/spec.md → 逐 turn 去重 | updated_at 并列时裁决与顺序无关 | cli/tokens-core/src/sessions/trae_cn.rs (tests) | test_dedupe_updated_at_tie_break_deterministic | 🟢 green |
+| specs/trae-cn-local-scan/spec.md → 逐 turn 去重 | updated_at 为 NULL 的行照常产出 | cli/tokens-core/src/sessions/trae_cn.rs (tests) | test_dedupe_missing_updated_at_still_emitted | 🟢 green |
+| specs/trae-cn-local-scan/spec.md → 逐 turn 去重 | 缓存序列化往返保留 turn 身份与更新时间 | cli/tokens-core/src/message_cache.rs (tests) | test_cache_roundtrip_preserves_turn_identity_and_updated_at | 🟢 green |
+| specs/trae-cn-local-scan/spec.md → 消息缓存格式升级兼容 | 旧格式 shard 升级保留消息与元数据 | cli/tokens-core/src/message_cache.rs (tests) | test_v9_shard_upgrade_preserves_messages_and_metadata | 🟢 green |
+| specs/trae-cn-local-scan/spec.md → 消息缓存格式升级兼容 | 缓存独有历史升级后保留 | cli/tokens-core/src/message_cache.rs (tests) | test_upgrade_preserves_claude_cache_only_history | 🟢 green |
+| specs/trae-cn-local-scan/spec.md → 消息缓存格式升级兼容 | fork-5/V7/V8 按既有语义迁移且谱系门禁不变 | cli/tokens-core/src/message_cache.rs (tests) | test_fork5_v7_v8_migrations_keep_semantics_and_gates | 🟢 green |
+| specs/trae-cn-local-scan/spec.md → 消息缓存格式升级兼容 | V4/V6 维持 Stale 且 upstream V5 不作为支持输入 | cli/tokens-core/src/message_cache.rs (tests) | test_v4_v6_stale_guard_and_upstream_v5_rejected | 🟢 green |
 | specs/trae-cn-local-scan/spec.md → 逐 turn 去重 | 跨库重复 turn 在缓存与发现顺序各安排下保留最新且仅计一次 | cli/tokens-core/src/lib.rs (tests) | test_dedupe_cross_db_newest_wins_across_cache_and_order | 🔴 red |
 | specs/trae-cn-local-scan/spec.md → 逐 turn 去重 | 两条流程合并后均执行去重 | cli/tokens-core/src/lib.rs (tests) | test_dedupe_applies_after_merge_in_both_flows | 🔴 red |
 | specs/trae-cn-local-scan/spec.md → 成本归属 | 已覆盖模型直接命中上游数据集 | cli/tokens-core/src/pricing/mod.rs (tests) | test_deepseek_v4_flash_first_party_resolves | 🔴 red |
