@@ -55,6 +55,7 @@ pub mod senpi;
 pub mod synthetic;
 pub(crate) mod tencent_buddy;
 pub mod trae;
+pub mod trae_cn;
 pub mod unsloth;
 pub(crate) mod utils;
 pub mod warp;

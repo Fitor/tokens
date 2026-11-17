@@ -31,9 +31,9 @@
 
 ## 5. schema 门禁（`sessions/trae_cn.rs`）
 
-- [ ] 5.1 Write failing tests: `test_schema_gate_passes_isomorphic_db`、`test_schema_gate_missing_column_skips_with_warning`、`test_schema_gate_query_failure_skips`。
-- [ ] 5.2 Implement: 7 列最小列集门禁（`context`、`session_id`、`turn_id`、`created_at`、`updated_at`、`turn_status`、`deleted_at`）+ 缺列跳过告警 + 门禁通过但查询失败跳过。
-- [ ] 5.3 Refactor；全套测试保持绿。
+- [x] 5.1 Write failing tests: `test_schema_gate_passes_isomorphic_db`、`test_schema_gate_missing_column_skips_with_warning`、`test_schema_gate_query_failure_skips`。
+- [x] 5.2 Implement: 7 列最小列集门禁（`context`、`session_id`、`turn_id`、`created_at`、`updated_at`、`turn_status`、`deleted_at`）+ 缺列跳过告警 + 门禁通过但查询失败跳过。
+- [x] 5.3 Refactor；全套测试保持绿。
 
 ## 6. 逐 turn 解析与归一化
 

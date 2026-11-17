@@ -21,9 +21,9 @@
 | specs/trae-cn-local-scan/spec.md → 坏页容忍与可见性 | 单个坏页不阻断扫描且计数可见 | cli/tokens-core/src/trae_db.rs (tests) | test_bad_page_continues_and_counts | 🟢 green |
 | specs/trae-cn-local-scan/spec.md → 坏页容忍与可见性 | 缓存命中扫描不重发坏页计数 | cli/tokens-core/src/lib.rs (tests) | test_cache_hit_does_not_reemit_bad_page_diag | 🔴 red |
 | specs/trae-cn-local-scan/spec.md → 坏页容忍与可见性 | 置零导致查询失败时跳过该 DB | cli/tokens-core/src/trae_db.rs (tests) | test_zeroed_interior_page_skips_db | 🟢 green |
-| specs/trae-cn-local-scan/spec.md → schema 门禁 | 同构 DB 正常解析 | cli/tokens-core/src/sessions/trae_cn.rs (tests) | test_schema_gate_passes_isomorphic_db | 🔴 red |
-| specs/trae-cn-local-scan/spec.md → schema 门禁 | 缺列 DB 被跳过且告警 | cli/tokens-core/src/sessions/trae_cn.rs (tests) | test_schema_gate_missing_column_skips_with_warning | 🔴 red |
-| specs/trae-cn-local-scan/spec.md → schema 门禁 | 门禁通过但查询失败时跳过 | cli/tokens-core/src/sessions/trae_cn.rs (tests) | test_schema_gate_query_failure_skips | 🔴 red |
+| specs/trae-cn-local-scan/spec.md → schema 门禁 | 同构 DB 正常解析 | cli/tokens-core/src/sessions/trae_cn.rs (tests) | test_schema_gate_passes_isomorphic_db | 🟢 green |
+| specs/trae-cn-local-scan/spec.md → schema 门禁 | 缺列 DB 被跳过且告警 | cli/tokens-core/src/sessions/trae_cn.rs (tests) | test_schema_gate_missing_column_skips_with_warning | 🟢 green |
+| specs/trae-cn-local-scan/spec.md → schema 门禁 | 门禁通过但查询失败时跳过 | cli/tokens-core/src/sessions/trae_cn.rs (tests) | test_schema_gate_query_failure_skips | 🟢 green |
 | specs/trae-cn-local-scan/spec.md → 逐 turn 解析与归一化 | 含缓存拆分的 turn 正确归一化 | cli/tokens-core/src/sessions/trae_cn.rs (tests) | test_normalize_turn_with_cache_split | 🔴 red |
 | specs/trae-cn-local-scan/spec.md → 逐 turn 解析与归一化 | total 对账失败的行被跳过 | cli/tokens-core/src/sessions/trae_cn.rs (tests) | test_skip_total_mismatch_row | 🔴 red |
 | specs/trae-cn-local-scan/spec.md → 逐 turn 解析与归一化 | cacheRead 超过 prompt 的行被跳过 | cli/tokens-core/src/sessions/trae_cn.rs (tests) | test_skip_cache_read_exceeds_prompt | 🔴 red |
