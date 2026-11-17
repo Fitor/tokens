@@ -686,6 +686,10 @@ export default function SettingsClient() {
   const { t, locale } = useI18n();
   const createTokenErrorId = useId();
   const deviceErrorId = useId();
+  // CLI hints must point at the deployment actually serving the page; the
+  // commands render client-side only (after auth + data load), so
+  // window.location.origin is the deployment origin here.
+  const siteOrigin = typeof window !== "undefined" ? window.location.origin : "";
   const [user, setUser] = useState<User | null>(null);
   const [tokens, setTokens] = useState<ApiToken[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -963,7 +967,7 @@ export default function SettingsClient() {
             <CodeText
               style={{ backgroundColor: "var(--muted)" }}
             >
-              tokens login
+              {`TOKENS_API_URL=${siteOrigin || "<site-origin>"} tokens login`}
             </CodeText>{" "}
             {t("settings.tokens.descB")}
           </Description>
@@ -1044,7 +1048,7 @@ export default function SettingsClient() {
                 <CodeText
                   style={{ backgroundColor: "var(--muted)" }}
                 >
-                  tokens login
+                  {`TOKENS_API_URL=${siteOrigin || "<site-origin>"} tokens login`}
                 </CodeText>{" "}
                 {t("settings.tokens.descB")}
               </EmptyText>
@@ -1119,7 +1123,7 @@ export default function SettingsClient() {
                 <CodeText
                   style={{ backgroundColor: "var(--muted)" }}
                 >
-                  bunx tokens-cli submit
+                  {`TOKENS_API_URL=${siteOrigin || "<site-origin>"} tokens submit`}
                 </CodeText>{" "}
                 {t("settings.devices.emptyHintB")}
               </EmptyText>

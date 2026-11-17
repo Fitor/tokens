@@ -4,7 +4,7 @@ import { CommandBlock, type DocCommand } from "@/components/docs/CommandBlock";
 import { BrandGlyph } from "@/components/profile/ModelIcon";
 import { CONTAINER } from "@/components/layout/Container";
 import {
-  BREW_INSTALL_COMMAND,
+  NPM_INSTALL_COMMAND,
   SOURCE_DISPLAY_NAMES,
   SOURCE_LOGOS,
   SUPPORTED_CLIENTS,
@@ -14,7 +14,7 @@ import { LOCALE_COOKIE, parseLocale, t, type Locale, type TranslationKey } from 
 import { cookies } from "next/headers";
 import { cn } from "@/lib/utils";
 import { SITE_URL } from "@/lib/site";
-import { SCRIPTS_RAW_BASE, SCRIPTS_BLOB_BASE } from "@/lib/scriptsRef";
+import { SCRIPTS_BLOB_BASE } from "@/lib/scriptsRef";
 
 
 export const metadata: Metadata = {
@@ -54,16 +54,15 @@ const CLIENT_GRID: ReadonlyArray<{ id: string; name: string; logo: string }> = [
 
 // Commands stay literal; the notes beside them are dictionary keys resolved
 // at render, so the arrays keep working as plain module constants.
+// The install lines (site pin + npm) are computed in the component from the
+// site origin so every tab points at the deployment it is served from.
 const MACOS = [
-  { command: BREW_INSTALL_COMMAND, note: "docs.note.install" },
   { command: "tokens login", note: "docs.note.signIn" },
-  // brew services start tokens would bypass the shell alias and submit
-  // upstream; serve in the foreground honors TOKENS_API_URL.
+  // tokens serve in the foreground honors the TOKENS_API_URL exported above;
+  // a background service would need its own TOKENS_API_URL.
   { command: "tokens serve", note: "docs.note.submitAuto" },
 ] as const;
 
-// URL-bearing rows are computed in the component from the site origin so the
-// docs page always points at the deployment it is served from.
 const LINUX = [
   { command: "tokens login", note: "docs.note.signIn" },
   { command: "tokens serve", note: "docs.note.submitAuto" },
@@ -148,16 +147,14 @@ function Section({
 
 export default async function DocsPage() {
   const locale = parseLocale((await cookies()).get(LOCALE_COOKIE)?.value);
-  // The install commands must point at the site serving this page.
+  // The install commands must point at the site serving this page: the first
+  // line of each platform block sets TOKENS_API_URL, the second installs the
+  // CLI via npm. The pre-install scripts stay in the repo for manual use but
+  // are no longer advertised as one-liners.
   const siteUrl = SITE_URL;
-  // Pre-install scripts execute straight from this repo's public GitHub at an
-  // immutable ref — a release tag or the pinned commit fallback, never a moving
-  // branch. Resolution (env override, release-advanced constant) lives in
-  // @/lib/scriptsRef.
-  const preinstallRaw = SCRIPTS_RAW_BASE;
-  const preinstallSh = `curl -fsSL ${preinstallRaw}/pre-install-tokens.sh | bash -s -- ${siteUrl}`;
-  const preinstallPs1 = `iex "& { $(irm ${preinstallRaw}/pre-install-tokens.ps1) } -Site ${siteUrl}"`;
-  // Resident-submission setup, served from this site like install.sh.
+  const posixSitePin = `export TOKENS_API_URL=${siteUrl}`;
+  const windowsSitePin = `$env:TOKENS_API_URL='${siteUrl}'`;
+  // Resident-submission setup, served from this site.
   const enableServiceSh = `curl -fsSL ${siteUrl}/enable-tokens-service.sh | bash -s -- ${siteUrl}`;
   const registerTaskPs1 = `iex "& { $(irm ${siteUrl}/register-tokens-submit-task.ps1) } -Site ${siteUrl}"`;
 
@@ -199,9 +196,9 @@ export default async function DocsPage() {
             <TabsContent value="macos" className="mt-4 flex flex-col gap-3">
               <CommandBlock
                 commands={[
-                  ...localize(locale, [MACOS[0]]),
-                  { command: preinstallSh, note: t(locale, "docs.note.preinstall") },
-                  ...localize(locale, MACOS.slice(1)),
+                  { command: posixSitePin, note: t(locale, "docs.note.sitePin") },
+                  { command: NPM_INSTALL_COMMAND, note: t(locale, "docs.note.install") },
+                  ...localize(locale, MACOS),
                 ]}
               />
               <p className="text-sm leading-relaxed text-muted-foreground">
@@ -224,8 +221,8 @@ export default async function DocsPage() {
             <TabsContent value="linux" className="mt-4 flex flex-col gap-3">
               <CommandBlock
                 commands={[
-                  { command: `curl -fsSL ${siteUrl}/install.sh | sh`, note: t(locale, "docs.note.install") },
-                  { command: preinstallSh, note: t(locale, "docs.note.preinstall") },
+                  { command: posixSitePin, note: t(locale, "docs.note.sitePin") },
+                  { command: NPM_INSTALL_COMMAND, note: t(locale, "docs.note.install") },
                   ...localize(locale, [LINUX[0]]),
                   { command: enableServiceSh, note: t(locale, "docs.note.setupService") },
                   ...localize(locale, LINUX.slice(1)),
@@ -243,7 +240,8 @@ export default async function DocsPage() {
             <TabsContent value="windows" className="mt-4 flex flex-col gap-3">
               <CommandBlock
                 commands={[
-                  { command: preinstallPs1, note: t(locale, "docs.note.preinstall") },
+                  { command: windowsSitePin, note: t(locale, "docs.note.sitePin") },
+                  { command: NPM_INSTALL_COMMAND, note: t(locale, "docs.note.install") },
                   ...localize(locale, WINDOWS),
                   { command: registerTaskPs1, note: t(locale, "docs.note.setupTask") },
                 ]}

@@ -47,42 +47,25 @@ CLI 读取的是你机器上 AI 客户端本来就会写盘的会话文件，在
 
 ## 安装 CLI 并指向你的站
 
-**macOS**
+安装需要 Node.js（https://nodejs.org）。npm 包会自动拉取对应平台的二进制。
 
 ```sh
-brew install owo-network/brew/tokens
+npm i -g @fitor/tokens-cli
 ```
-
-**Linux**
-
-```sh
-curl -fsSL https://<你的域名>/install.sh | sh
-```
-
-**Windows**
-
-```sh
-npm i -g tokens-cli
-```
-
-不要用 `bunx tokens-cli@latest` 登录或提交。它不会带上本站地址，会走到上游默认站。用下面的预安装脚本，或给每条命令设置 `TOKENS_API_URL`。
 
 然后任意平台：
 
 ```sh
-tokens logout                                       # 清掉其他站的旧凭据
-TOKENS_API_URL=https://<你的域名> tokens login       # 浏览器打开 <你的域名>/device 授权
-TOKENS_API_URL=https://<你的域名> tokens submit
-TOKENS_API_URL=https://<你的域名> tokens login --private   # 可选：隐藏这个账号
+export TOKENS_API_URL=https://<你的域名>       # 让下面的命令都指向你的站
+tokens logout                                  # 清掉其他站的旧凭据
+tokens login                                   # 浏览器打开 <你的域名>/device 授权
+tokens submit
+tokens login --private                         # 可选：隐藏这个账号
 ```
 
-每条命令都要带 `TOKENS_API_URL`（或在当前 shell 里 export 一次）——CLI 默认指向上游站，凭据也不记自己属于哪个站。仓库根目录还提供 `pre-install-tokens.sh` / `pre-install-tokens.ps1` 一键预安装脚本：装 CLI、清旧凭据、把默认指向固定到你的站。可直接从本仓库的 GitHub 公开地址远程执行（钉住审过的 tag 或 commit，不跟随分支漂移）：
+上面的 `export` 只在当前 shell 生效。重开终端后要重新设置 `TOKENS_API_URL`（或写进 rc 文件）。CLI 默认指向上游站，凭据也不记自己属于哪个站。不要用旧上游包的 `bunx` / `npx` 裸命令登录或提交。裸命令不带本站地址，会走到上游默认站。
 
-```sh
-curl -fsSL https://raw.githubusercontent.com/KunoLu/tokens/v1.0.5/pre-install-tokens.sh | bash -s -- https://<你的域名>
-```
-
-预装完成后，`enable-tokens-service.sh`（Linux）与 `register-tokens-submit-task.ps1`（Windows）可配置常驻自动提交——由你部署的站点提供下载，docs 页有现成命令，详见手册。
+预装脚本 `pre-install-tokens.sh` / `pre-install-tokens.ps1` 仍随仓库提供，供手动使用：装 CLI、清旧凭据、把默认指向固定到你的站。文档与站点不再提供一键下载命令。预装完成后，`enable-tokens-service.sh`（Linux）与 `register-tokens-submit-task.ps1`（Windows）可配置常驻自动提交——由你部署的站点提供下载，docs 页有现成命令，详见手册。
 
 详见 [docs/deploy/tokens-cli-usage.md](./docs/deploy/tokens-cli-usage.md)。
 

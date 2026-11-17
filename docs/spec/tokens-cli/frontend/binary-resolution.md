@@ -12,7 +12,7 @@
 - **OS/arch** map from `process.platform`/`process.arch` to a directory name
   like `cli-darwin-arm64` in `resolveTargetPackageName()` (`index.ts:133+`).
   The directory name equals the monorepo directory and the suffix of the
-  unscoped npm package name (`tokens-cli-darwin-arm64` ↔ `packages/cli-darwin-arm64/`).
+  scoped npm package name (`@fitor/tokens-cli-darwin-arm64` ↔ `packages/cli-darwin-arm64/`).
 - **libc** matters only on Linux: `detectLibcKind()` (`index.ts:29-89`)
   distinguishes `gnu` from `musl` by looking for the dynamic loader —
   glibc ships `ld-linux-*.so.*` in `/lib64` (or `/lib`), musl distros ship
@@ -23,9 +23,10 @@
 ## Search paths (in order)
 
 1. The sibling platform package:
-   `.../node_modules/tokens-cli-<platform>/bin/tokens` — the packages are
-   unscoped, so platform binaries are siblings of the dispatcher under the same
-   `node_modules` (path math and comments at `index.ts:9-25,170-185`).
+   `.../node_modules/@fitor/tokens-cli-<platform>/bin/tokens` — the packages are
+   scoped, so platform binaries are siblings of the dispatcher under the same
+   `@fitor` scope directory inside `node_modules` (path math and comments at
+   `index.ts:9-25,170-185`).
 2. Cargo cross-build output:
    `<repo>/cli/target/<rust-target-triple>/release/tokens`
    (`resolveRustTargetTriple()`, `index.ts:166,191-194`).

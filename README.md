@@ -64,51 +64,36 @@ Because you self-host, the data sits in your own Postgres as well.
 
 ## Install the CLI and point it at your site
 
-**macOS**
+Install requires Node.js (https://nodejs.org). The npm package pulls the
+matching platform binary automatically.
 
 ```sh
-brew install owo-network/brew/tokens
+npm i -g @fitor/tokens-cli
 ```
-
-**Linux**
-
-```sh
-curl -fsSL https://<your-domain>/install.sh | sh
-```
-
-**Windows**
-
-```sh
-npm i -g tokens-cli
-```
-
-Do not use `bunx tokens-cli@latest` to log in or submit. It skips the site pin
-and talks to the upstream default. Use the pre-install script below, or set
-`TOKENS_API_URL` on every command.
 
 Then, on any platform:
 
 ```sh
+export TOKENS_API_URL=https://<your-domain>       # pin the commands below to your site
 tokens logout                                     # clears any credentials from another site
-TOKENS_API_URL=https://<your-domain> tokens login  # browser opens <your-domain>/device
-TOKENS_API_URL=https://<your-domain> tokens submit
-TOKENS_API_URL=https://<your-domain> tokens login --private   # optional: hide this account
+tokens login                                      # browser opens <your-domain>/device
+tokens submit
+tokens login --private                            # optional: hide this account
 ```
 
-`TOKENS_API_URL` must be set on every command (or exported once per shell) —
-the CLI defaults to the upstream site and credentials do not record which site
-they belong to. The repo root also carries `pre-install-tokens.sh` /
-`pre-install-tokens.ps1`, one-step onboarding scripts that install the CLI,
-clear old credentials, and pin it to your site — runnable straight from the
-repo's public GitHub (pinned to a reviewed tag or commit, never a moving branch):
+The `export` lasts only for the current shell. Set `TOKENS_API_URL` again in
+new shells (or put it in your rc file). The CLI defaults to the upstream site
+and credentials do not record which site they belong to. Do not log in or
+submit with bare `bunx` / `npx` commands for the old upstream package: bare
+commands skip the site pin and talk to the upstream default.
 
-```sh
-curl -fsSL https://raw.githubusercontent.com/KunoLu/tokens/v1.0.5/pre-install-tokens.sh | bash -s -- https://<your-domain>
-```
-
-After onboarding, `enable-tokens-service.sh` (Linux) and
-`register-tokens-submit-task.ps1` (Windows) set up resident auto-submission —
-your deployed site serves them; the docs page shows the exact commands.
+The repo root also carries `pre-install-tokens.sh` / `pre-install-tokens.ps1`,
+one-step onboarding scripts that install the CLI, clear old credentials, and
+pin it to your site. They ship with the repo for manual use; docs and site no
+longer print download one-liners. After onboarding, `enable-tokens-service.sh`
+(Linux) and `register-tokens-submit-task.ps1` (Windows) set up resident
+auto-submission — your deployed site serves them; the docs page shows the
+exact commands.
 
 See [docs/deploy/tokens-cli-usage.en.md](./docs/deploy/tokens-cli-usage.en.md).
 

@@ -3,7 +3,7 @@
 # pre-install-tokens.sh — 把用户的 tokens CLI 预装并指向自建站（macOS / Linux）。
 #
 # 做三件事：
-#   1. 检测 tokens CLI，没装则按平台安装；
+#   1. 检测 tokens CLI，没装则用 npm 全局安装（@fitor/tokens-cli，需要 Node.js）；
 #   2. `tokens logout`（无论当前是否登录，直接清掉，简化流程）；
 #   3. 往 shell rc 写入全局 alias，让 `tokens` 默认带上 TOKENS_API_URL 指向本站。
 #
@@ -46,24 +46,12 @@ OS="$(uname -s)"
 if command -v tokens >/dev/null 2>&1; then
   ok "tokens CLI 已安装"
 elif [ "$DRY_RUN" = 1 ]; then
-  info "[dry-run] tokens CLI 未安装；实跑将按平台安装（macOS: brew；Linux: install.sh 且 TOKENS_NO_SERVICE=1）"
+  info "[dry-run] tokens CLI 未安装；实跑将执行 npm i -g @fitor/tokens-cli"
 else
   info "tokens CLI 未安装，开始安装"
-  case "$OS" in
-    Darwin)
-      command -v brew >/dev/null 2>&1 || die "需要 Homebrew（https://brew.sh）后再运行本脚本"
-      brew install owo-network/brew/tokens
-      ;;
-    Linux)
-      # install.sh 默认会创建 systemd 用户服务 tokens.service 常驻自动上报；
-      # 它读的是默认上游地址，alias 管不到它——preinstall 阶段必须先不起服务，
-      # 否则用户还没指到本站就已经开始往上游报了。
-      TOKENS_NO_SERVICE=1 bash <(curl -fsSL https://s.ee/tokens)
-      ;;
-    *)
-      die "不支持的平台：$OS（Windows 请用 pre-install-tokens.ps1）"
-      ;;
-  esac
+  command -v npm >/dev/null 2>&1 \
+    || die "未找到 npm。npm 安装通道需要 Node.js：请先安装 Node.js（https://nodejs.org）后重试"
+  npm i -g @fitor/tokens-cli || die "npm 安装失败（退出码 $?）。本机未做任何修改，请排查 npm 后重试"
   command -v tokens >/dev/null 2>&1 || die "安装后仍找不到 tokens，请检查 PATH"
   ok "tokens CLI 安装完成"
 fi

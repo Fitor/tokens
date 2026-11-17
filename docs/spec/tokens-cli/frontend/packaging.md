@@ -1,15 +1,15 @@
 # Packaging: Platform Binary Packages and Publishing
 
 > How the Rust binary reaches users: eight platform npm packages, one launcher
-> package, a single version writer, one publish workflow, and a GitHub-tarball
-> installer as a parallel channel. Shared by all eight
-> `tokens-cli-<os>-<arch>` packages.
+> package, a single version writer, one publish workflow, and a legacy
+> GitHub-tarball installer. Shared by all eight
+> `@fitor/tokens-cli-<os>-<arch>` packages.
 
 ---
 
 ## The eight platform packages
 
-One per target triple, named `tokens-cli-<os>-<arch>[-<libc>]`:
+One per target triple, named `@fitor/tokens-cli-<os>-<arch>[-<libc>]`:
 
 `darwin-arm64`, `darwin-x64`, `linux-x64-gnu`, `linux-x64-musl`,
 `linux-arm64-gnu`, `linux-arm64-musl`, `win32-x64-msvc`, `win32-arm64-msvc`
@@ -22,7 +22,7 @@ is never committed. Manifest shape (example
 
 ```json
 {
-  "name": "tokens-cli-darwin-arm64",
+  "name": "@fitor/tokens-cli-darwin-arm64",
   "os": ["darwin"],
   "cpu": ["arm64"],
   "main": "bin/tokens",
@@ -69,11 +69,11 @@ the script makes drift impossible (comment at `set-version.sh:3-8`).
 6. Commits the version bump and creates GitHub release tarballs
    (`tokens-v{version}-{triple}.tar.gz`).
 
-## `install.sh`: a different channel
+## `install.sh`: legacy tarball channel
 
-Root `install.sh` (`curl -fsSL https://s.ee/tokens | bash`) is Linux-only and
-installs from **GitHub release tarballs**, not npm: it downloads the prebuilt
-binary for the architecture and optionally sets up a systemd *user* service
-running `tokens serve`. The tarball naming contract
+Root `install.sh` installs a Linux binary from **GitHub release tarballs**,
+not npm: it downloads the prebuilt binary for the architecture and optionally
+sets up a systemd *user* service running `tokens serve`. It is not an
+advertised install path anymore — docs and site prompts point at
+`npm i -g @fitor/tokens-cli` only. The tarball naming contract
 (`tokens-v{version}-{triple}.tar.gz`) is what `publish-cli.yml` produces.
-macOS users install via Homebrew instead (`install.sh:42`).

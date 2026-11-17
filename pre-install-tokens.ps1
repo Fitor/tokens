@@ -1,7 +1,7 @@
 # pre-install-tokens.ps1 — 把用户的 tokens CLI 预装并指向自建站（Windows）。
 #
 # 做三件事：
-#   1. 检测 tokens CLI，没装则用 npm 全局安装（tokens-cli 包）；
+#   1. 检测 tokens CLI，没装则用 npm 全局安装（@fitor/tokens-cli 包）；
 #   2. tokens logout（无论当前是否登录，直接清掉，简化流程）；
 #   3. 往 PowerShell $PROFILE 写入 function tokens，让 tokens 默认带上
 #      TOKENS_API_URL 指向本站（PowerShell 的 alias 不能带环境变量，必须用 function）。
@@ -45,14 +45,14 @@ $tokensCmd = Get-Command tokens -CommandType Application -ErrorAction SilentlyCo
 if ($tokensCmd) {
     Write-Host "✓ tokens CLI 已安装：$($tokensCmd.Source)"
 } elseif ($DryRun) {
-    Write-Host "[dry-run] tokens CLI 未安装；实跑将执行 npm i -g tokens-cli"
+    Write-Host "[dry-run] tokens CLI 未安装；实跑将执行 npm i -g @fitor/tokens-cli"
 } else {
-    Write-Host "==> tokens CLI 未安装，用 npm 全局安装（tokens-cli 包，含平台二进制）"
+    Write-Host "==> tokens CLI 未安装，用 npm 全局安装（@fitor/tokens-cli 包，含平台二进制）"
     if (-not (Get-Command npm -ErrorAction SilentlyContinue)) {
         Write-Error "未找到 tokens CLI，且没有 npm 可用。请先安装 Node.js（https://nodejs.org）后重试。"
         exit 1
     }
-    npm i -g tokens-cli
+    npm i -g @fitor/tokens-cli
     $tokensCmd = Get-Command tokens -CommandType Application -ErrorAction SilentlyContinue
     if (-not $tokensCmd) { Write-Error "安装后仍找不到 tokens，请重开终端后重试"; exit 1 }
     Write-Host "✓ tokens CLI 安装完成：$($tokensCmd.Source)"

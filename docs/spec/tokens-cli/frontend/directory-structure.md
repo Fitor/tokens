@@ -1,6 +1,6 @@
 # Directory Structure: `packages/cli` npm Launcher
 
-> The `tokens-cli` npm package is a native-binary dispatcher. Everything in it
+> The `@fitor/tokens-cli` npm package is a native-binary dispatcher. Everything in it
 > exists to find the right prebuilt Rust binary and exec it.
 
 ---
@@ -28,7 +28,7 @@ There is no other source. No UI, no commands, no config schema.
   `prepublishOnly` running the build.
 - `"dependencies": {}` — zero runtime dependencies, on purpose. The dispatcher
   uses only `node:*` builtins so it runs on any Node that can host npm.
-- `optionalDependencies` pin all eight `tokens-cli-<os>-<arch>` packages at the
+- `optionalDependencies` pin all eight `@fitor/tokens-cli-<os>-<arch>` packages at the
   **exact same version** as the launcher (`package.json:31-40`). npm installs
   only the one matching the host's `os`/`cpu`/`libc`; the dispatcher resolves
   the binary inside that sibling package.

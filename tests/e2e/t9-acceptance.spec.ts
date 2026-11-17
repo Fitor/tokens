@@ -17,41 +17,125 @@ test("未登录导航 Sign in 是带回跳的登录链接", async ({ page }) => 
 
 
 
-test("Docs 页安装入口指向本站", async ({ page }) => {
+// 安装引导契约：npm 安装命令 + 站点指向首行（specs/cli-install/spec.md）。
+// 本站源在本地 e2e 环境是部署 origin http://localhost:3000。
+const SITE_ORIGIN = "http://localhost:3000";
+const NPM_INSTALL = "npm i -g @fitor/tokens-cli";
+const MANUAL_HREF_PATTERN =
+  /^https:\/\/github\.com\/Fitor\/tokens\/blob\/(v\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?|[0-9a-f]{40})\/docs\/deploy\/tokens-cli-usage\.md$/;
+
+test("docs 页各平台页签给出 npm 安装命令", async ({ page }) => {
   const response = await page.goto("/docs");
   expect(response?.status()).toBe(200);
   const html = await page.content();
-  expect(html).not.toContain("tokens.ci");
-  await expect(page.getByText(/raw\.githubusercontent\.com\/KunoLu\/tokens\/(?:v\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?|[0-9a-f]{40})\/pre-install-tokens\.sh/).first()).toBeVisible();
-  expect(html).toContain("reopen the terminal");
-  await expect(page.getByRole("tabpanel", { name: /macos/i }).getByText(/\. \$PROFILE/)).toHaveCount(0);
-  const brewPos = html.indexOf("brew install");
-  const piPos = html.indexOf("pre-install-tokens.sh");
-  const loginPos = html.indexOf("tokens login");
-  expect(brewPos).toBeGreaterThan(-1);
-  expect(brewPos).toBeLessThan(piPos);
-  expect(piPos).toBeLessThan(loginPos);
-  expect(html).not.toContain("brew services");
-  expect(html).toContain("docs/deploy/tokens-cli-usage.md");
-  expect(html).toContain("site's origin (http://localhost:3000)");
-  await page.getByRole("tab", { name: /windows/i }).click();
-  await expect(page.getByText(/pre-install-tokens\.ps1/).first()).toBeVisible();
-  expect(await page.content()).not.toContain("bunx tokens-cli");
-  const windowsPanel = page.getByRole("tabpanel");
-  await expect(windowsPanel.getByText(/\. \$PROFILE/)).toBeVisible();
-  await expect(windowsPanel.getByRole("code").filter({ hasText: "tokens login" })).toBeVisible();
-  await expect(windowsPanel.getByRole("code").filter({ hasText: "tokens submit" })).toBeVisible();
-  await expect(windowsPanel.getByRole("code").filter({ hasText: "localhost:3000/register-tokens-submit-task.ps1" })).toBeVisible();
-  await page.setViewportSize({ width: 390, height: 844 });
-  await expect(windowsPanel.getByText(/\. \$PROFILE/)).toBeVisible();
+  expect(html).not.toContain("brew install");
+  expect(html).not.toContain("install.sh | sh");
+  expect(html).not.toContain("npm i -g tokens-cli");
+
+  // macOS 页签（默认打开）：首行 export TOKENS_API_URL，块内含 npm 安装命令。
+  const macosPanel = page.getByRole("tabpanel", { name: /macos/i });
+  await expect(macosPanel.getByRole("code").first()).toContainText(
+    `export TOKENS_API_URL=${SITE_ORIGIN}`
+  );
+  await expect(
+    macosPanel.getByRole("code").filter({ hasText: NPM_INSTALL }).first()
+  ).toBeVisible();
+
+  // Linux 页签：同样的首行与 npm 安装命令。
   await page.getByRole("tab", { name: /linux/i }).click();
-  await expect(page.getByRole("tabpanel").getByRole("code").filter({ hasText: "localhost:3000/enable-tokens-service.sh" })).toBeVisible();
-  await expect(page.getByText("Register on this site and stay signed in before you run tokens login.")).toBeVisible();
+  const linuxPanel = page.getByRole("tabpanel", { name: /linux/i });
+  await expect(linuxPanel.getByRole("code").first()).toContainText(
+    `export TOKENS_API_URL=${SITE_ORIGIN}`
+  );
+  await expect(
+    linuxPanel.getByRole("code").filter({ hasText: NPM_INSTALL }).first()
+  ).toBeVisible();
+
+  // Windows 页签：首行 $env:TOKENS_API_URL，块内含 npm 安装命令。
+  await page.getByRole("tab", { name: /windows/i }).click();
+  const windowsPanel = page.getByRole("tabpanel", { name: /windows/i });
+  await expect(windowsPanel.getByRole("code").first()).toContainText(
+    `$env:TOKENS_API_URL='${SITE_ORIGIN}'`
+  );
+  await expect(
+    windowsPanel.getByRole("code").filter({ hasText: NPM_INSTALL }).first()
+  ).toBeVisible();
+
+  // 保留区块：private mode 与 Everyday use 的既有结构不随安装通道改动。
   await expect(page.getByRole("heading", { name: "Private mode" })).toBeVisible();
   await expect(page.getByRole("code").filter({ hasText: "tokens login --private" })).toBeVisible();
   await expect(page.getByRole("link", { name: "Privacy in Settings" })).toHaveAttribute("href", "/settings");
   expect(html).toContain("These five cover submitting usage.");
-  expect(html).not.toContain("Five commands cover the whole workflow.");
+});
+
+test("docs 页不含旧链接", async ({ page }) => {
+  const response = await page.goto("/docs");
+  expect(response?.status()).toBe(200);
+  const html = await page.content();
+  expect(html).not.toContain("raw.githubusercontent.com");
+  expect(html).not.toContain("KunoLu");
+  expect(html).not.toContain("brew install");
+  expect(html).not.toContain("install.sh | sh");
+  expect(html).not.toContain("npm i -g tokens-cli");
+});
+
+test("docs 页无脚本下载命令", async ({ page }) => {
+  const response = await page.goto("/docs");
+  expect(response?.status()).toBe(200);
+  const html = await page.content();
+  // pre-install 脚本不再以任何下载命令出现：无路径引用，无 curl / iex 组合。
+  expect(html).not.toContain("/pre-install-tokens.sh");
+  expect(html).not.toContain("/pre-install-tokens.ps1");
+  expect(html).not.toMatch(/curl[^<]{0,300}pre-install-tokens/i);
+  expect(html).not.toMatch(/iex[^<]{0,300}pre-install-tokens/i);
+});
+
+test("手册链接指向新仓库钉版 ref", async ({ page }) => {
+  const response = await page.goto("/docs");
+  expect(response?.status()).toBe(200);
+  const links = page.locator('a[href*="/docs/deploy/tokens-cli-usage.md"]');
+  const count = await links.count();
+  expect(count).toBeGreaterThan(0);
+  for (let i = 0; i < count; i++) {
+    const href = await links.nth(i).getAttribute("href");
+    expect(href).toMatch(MANUAL_HREF_PATTERN);
+  }
+});
+
+test("settings 提示命令带站点绑定", async ({ page }) => {
+  const user = fixtureUser(`t9set${Date.now().toString(36)}`, "c");
+  try {
+    await registerUser(page, user);
+    const response = await page.goto("/settings");
+    expect(response?.status()).toBe(200);
+
+    // 两处 tokens login 提示（tokens 区描述 + tokens 空态）都带站点绑定。
+    const loginHints = page
+      .getByRole("code")
+      .filter({ hasText: `TOKENS_API_URL=${SITE_ORIGIN} tokens login` });
+    await expect(loginHints.first()).toBeVisible();
+    expect(await loginHints.count()).toBe(2);
+
+    // devices 空态提示：TOKENS_API_URL=<origin> tokens submit。
+    await expect(
+      page
+        .getByRole("code")
+        .filter({ hasText: `TOKENS_API_URL=${SITE_ORIGIN} tokens submit` })
+    ).toBeVisible();
+
+    // 旧上游包引导消失。
+    expect(await page.content()).not.toContain("bunx tokens-cli");
+  } finally {
+    await deleteFixtureUsers([user.username]);
+  }
+});
+
+test("/local 页安装引导显示 npm 命令", async ({ page }) => {
+  const response = await page.goto("/local");
+  expect(response?.status()).toBe(200);
+  const html = await page.content();
+  expect(html).toContain(NPM_INSTALL);
+  expect(html).not.toContain("brew install");
 });
 
 test("页脚只保留版权与署名行", async ({ page }) => {

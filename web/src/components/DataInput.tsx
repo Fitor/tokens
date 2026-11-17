@@ -2,7 +2,7 @@
 
 import { useCallback, useId, useState } from "react";
 import { Button } from "@/components/ui/button";
-import { BREW_INSTALL_COMMAND } from "@/lib/constants";
+import { NPM_INSTALL_COMMAND } from "@/lib/constants";
 import type { TokenContributionData } from "@/lib/types";
 import { isValidContributionData } from "@/lib/utils";
 import { useI18n } from "@/lib/i18n";
@@ -148,7 +148,7 @@ export function DataInput({ onDataLoaded }: DataInputProps) {
           <li className="leading-relaxed">
             {t("dataInput.install")}{" "}
             <code className="rounded bg-muted px-1.5 py-0.5 font-mono text-[0.85em] text-foreground">
-              {BREW_INSTALL_COMMAND}
+              {NPM_INSTALL_COMMAND}
             </code>
           </li>
           <li className="leading-relaxed">

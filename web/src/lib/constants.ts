@@ -284,9 +284,9 @@ export const SUPPORTED_CLIENTS: readonly ClientType[] = [
 ] as const;
 
 // Install command. Shared so the docs page and the local viewer cannot drift —
-// the plain `brew install tokens` the viewer used to print installs a different
-// package. Matches install.sh's macOS hint.
-export const BREW_INSTALL_COMMAND = "brew install owo-network/brew/tokens";
+// both entries print the same npm install line for @fitor/tokens-cli (bin
+// `tokens`). Requires Node.js; the package pulls the matching platform binary.
+export const NPM_INSTALL_COMMAND = "npm i -g @fitor/tokens-cli";
 
 // Derived values
 export const CELL_SIZE = BOX_WIDTH + BOX_MARGIN;

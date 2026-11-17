@@ -53,15 +53,15 @@ Prerequisite, provided by the operator: the site is up at `https://<production-d
 
 **Step 1: install the CLI** (skip if it is already installed)
 
-| Platform | Install |
-|---|---|
-| macOS | `brew install owo-network/brew/tokens` |
-| Linux | Official `install.sh` (command below). By default it also installs a resident auto-submit service. See the note below |
-| Windows | `npm i -g tokens-cli` (needs Node.js; the `tokens-cli` package pulls the matching platform binary) |
+This requires Node.js (https://nodejs.org).
 
 ```bash
-curl -fsSL https://s.ee/tokens | bash
+npm i -g @fitor/tokens-cli
 ```
+
+The npm package pulls the matching platform binary automatically.
+
+Trust assumption: `npm i -g @fitor/tokens-cli` installs the latest release, and installation runs the platform packages' install scripts. Whether you trust that source is your call. To pin a version, add `@<version>`, for example `npm i -g @fitor/tokens-cli@1.0.5`.
 
 **Step 2: clear old credentials**
 
@@ -95,7 +95,7 @@ TOKENS_API_URL=https://<production-domain> tokens submit
 
 - Every `tokens` command reads `TOKENS_API_URL`. Export it once in the current shell, or run the pre-install script in section 3. That script writes an alias into the shell config so it persists.
 - Usage history and tokens from tokens.ci are not migrated. This site is a new database. Register again and log in again.
-- The official Linux `install.sh` starts a resident auto-submit service (`tokens.service`) by default. That service **does not read** a shell alias and will keep submitting to upstream. Either install with `TOKENS_NO_SERVICE=1`, or add `Environment=TOKENS_API_URL=https://<production-domain>` under `[Service]` in `~/.config/systemd/user/tokens.service`, then `systemctl --user daemon-reload && systemctl --user restart tokens`. macOS `brew services start tokens` has the same problem.
+- A Linux machine that was set up with the official `install.sh` carries a resident auto-submit service (`tokens.service`) by default. That service **does not read** a shell alias and will keep submitting to upstream. Add `Environment=TOKENS_API_URL=https://<production-domain>` under `[Service]` in `~/.config/systemd/user/tokens.service`, then run `systemctl --user daemon-reload && systemctl --user restart tokens`. macOS `brew services start tokens` has the same problem. The pre-install script stops such a resident service when it detects one.
 
 ---
 
@@ -105,7 +105,7 @@ TOKENS_API_URL=https://<production-domain> tokens submit
 
 **The scripts do three things:**
 
-1. **Detect or install the tokens CLI.** Skip if it is installed. Otherwise install by platform: brew on macOS, official `install.sh` on Linux with `TOKENS_NO_SERVICE=1` so no resident service starts, and `npm i -g tokens-cli` on Windows. If a resident submit service is already present (`tokens.service`, or brew services' tokens), the script stops it. A resident service does not read a shell alias and would keep reporting to upstream.
+1. **Detect or install the tokens CLI.** Skip if it is installed. Otherwise run `npm i -g @fitor/tokens-cli` (needs Node.js). If a resident submit service is already present (`tokens.service`, or brew services' tokens), the script stops it. A resident service does not read a shell alias and would keep reporting to upstream.
 2. **`tokens logout`.** Clears whatever is logged in, upstream or another site, so the next login is clean.
 3. **Write a global alias or function.** Wraps the `tokens` command so it always sets `TOKENS_API_URL=https://<production-domain>`. macOS/Linux writes `~/.zshrc` or `~/.bashrc`. Windows writes the PowerShell `$PROFILE`. PowerShell aliases cannot carry an environment variable, so this is a function.
 
@@ -113,17 +113,11 @@ TOKENS_API_URL=https://<production-domain> tokens submit
 
 Preview first: `--dry-run` (sh) or `-DryRun` (ps1) prints the install, logout, and config write without changing anything.
 
-**Preferred: run the pinned script without cloning**
+**Getting the scripts:**
 
-```bash
-# macOS / Linux (pinned ref, not a moving branch)
-curl -fsSL https://raw.githubusercontent.com/KunoLu/tokens/v1.0.5/pre-install-tokens.sh | bash -s -- https://<production-domain>
+The scripts ship with the repo and with the site, for manual use: take them from the repo root, or download `https://<production-domain>/pre-install-tokens.sh` (`.ps1` on Windows). Docs no longer print remote one-line commands.
 
-# Windows
-iex "& { $(irm https://raw.githubusercontent.com/KunoLu/tokens/v1.0.5/pre-install-tokens.ps1) } -Site https://<production-domain>"
-```
-
-The script URL points at an immutable ref (a tag or a pinned commit, never a branch). At release, `scripts/set-version.sh <version>` advances `PINNED_SCRIPTS_REF` in `web/src/lib/scriptsRef.ts` to the `v<version>` about to be created, and replaces the old ref in this manual and the READMEs. The order is fixed: set-version, commit, tag, deploy. It does not scan tags. Historical tags (`v27.0.0` / `v27.0.1`) do not contain the pre-install scripts, so a scan would 404. An emergency override is the `TOKENS_SCRIPTS_REF` env var. It accepts only `vX.Y.Z[-prerelease]` or a 40-character SHA; an invalid value falls back to the pin. The site build also copies the script to `https://<production-domain>/pre-install-tokens.sh` as an alternate download.
+Pinned ref: the "CLI guide" link and the release flow share one pinned ref. The value lives only in `PINNED_SCRIPTS_REF` in `web/src/lib/scriptsRef.ts`; this manual does not hard-code a ref value. At release, `scripts/set-version.sh <version>` advances that value to the `v<version>` about to be created. The order is fixed: set-version, commit, tag, deploy. An emergency override is the `TOKENS_SCRIPTS_REF` env var. It accepts only `vX.Y.Z[-prerelease]` or a 40-character SHA; an invalid value falls back to the pin.
 
 **Local files:**
 

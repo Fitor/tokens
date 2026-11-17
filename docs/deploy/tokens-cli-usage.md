@@ -50,15 +50,15 @@ TOKENS_API_URL=http://localhost:3000 tokens login --private
 
 **第一步：装 CLI**（已装跳过）
 
-| 平台 | 安装方式 |
-|---|---|
-| macOS | `brew install owo-network/brew/tokens` |
-| Linux | 官方 install.sh（命令见下方代码块；默认会装一个常驻自动上报服务，见下方注意） |
-| Windows | `npm i -g tokens-cli`（需要 Node.js；npm 包 `tokens-cli` 会拉对应平台二进制） |
+需要 Node.js（https://nodejs.org）。
 
 ```bash
-curl -fsSL https://s.ee/tokens | bash
+npm i -g @fitor/tokens-cli
 ```
+
+npm 包会自动拉取对应平台的二进制。
+
+信任假设：`npm i -g @fitor/tokens-cli` 安装最新发布版，安装期会运行平台包的安装脚本。是否信任该来源由你决定。需要钉版时在包名后加 `@<版本>`，例如 `npm i -g @fitor/tokens-cli@1.0.5`。
 
 **第二步：清掉旧凭据**
 
@@ -92,7 +92,7 @@ TOKENS_API_URL=https://<线上域名> tokens submit
 
 - `tokens` 的每条命令都读 `TOKENS_API_URL`；嫌每次敲前缀，当前 shell 里 `export TOKENS_API_URL=https://<线上域名>` 一次，或直接跑第 3 章的预安装脚本（它会把 alias 写进 shell 配置，长期生效）。
 - tokens.ci 的历史用量和 token 不会迁过来；本站是独立新库，重新注册、重新登录。
-- Linux 用官方 `install.sh` 安装时默认会起一个常驻自动上报服务（`tokens.service`），它**不读** shell alias，会一直报上游。要么安装时 `TOKENS_NO_SERVICE=1`，要么往 `~/.config/systemd/user/tokens.service` 的 `[Service]` 段加 `Environment=TOKENS_API_URL=https://<线上域名>` 后 `systemctl --user daemon-reload && systemctl --user restart tokens`。macOS 的 `brew services start tokens` 同理。
+- 曾用官方 `install.sh` 安装的 Linux 机器默认带一个常驻自动上报服务（`tokens.service`），它**不读** shell alias，会一直报上游。往 `~/.config/systemd/user/tokens.service` 的 `[Service]` 段加 `Environment=TOKENS_API_URL=https://<线上域名>`，再 `systemctl --user daemon-reload && systemctl --user restart tokens`。macOS 的 `brew services start tokens` 同理。pre-install 脚本检测到这类常驻服务会停掉它。
 
 ---
 
@@ -102,7 +102,7 @@ TOKENS_API_URL=https://<线上域名> tokens submit
 
 **脚本做三件事：**
 
-1. **检测 / 安装 tokens CLI**：已装就跳过；没装按平台装（macOS 走 brew，Linux 走官方 `install.sh` 但带 `TOKENS_NO_SERVICE=1` 不起常驻服务，Windows 走 `npm i -g tokens-cli`）。Linux/macOS 上若检测到已有的常驻上报服务（`tokens.service` / `brew services` 的 tokens），会停掉它——常驻服务不读 shell alias，不停就会一直报上游。
+1. **检测 / 安装 tokens CLI**：已装就跳过。没装就运行 `npm i -g @fitor/tokens-cli`（需要 Node.js）。Linux/macOS 上若检测到已有的常驻上报服务（`tokens.service` / `brew services` 的 tokens），会停掉它。常驻服务不读 shell alias，不停就会一直报上游。
 2. **`tokens logout`**：无论当前登录的是上游还是别的站，直接清掉，后续统一重新登录。
 3. **写入全局 alias / function**：覆盖默认 `tokens` 命令，让它永远带上 `TOKENS_API_URL=https://<线上域名>`。macOS/Linux 写进 `~/.zshrc` 或 `~/.bashrc`；Windows 写进 PowerShell `$PROFILE`（PowerShell 的 alias 不能带环境变量，所以用的是 function）。
 
@@ -110,17 +110,11 @@ TOKENS_API_URL=https://<线上域名> tokens submit
 
 脚本支持先看后跑：`--dry-run`（sh）/ `-DryRun`（ps1）只打印将要做的安装、logout 和配置写入，不改动任何东西。
 
-**推荐：无需 clone 仓库，直接远程执行钉住版本的脚本**
+**脚本获取：**
 
-```bash
-# macOS / Linux（钉住 commit，不跟随分支漂移）
-curl -fsSL https://raw.githubusercontent.com/KunoLu/tokens/v1.0.5/pre-install-tokens.sh | bash -s -- https://<线上域名>
+脚本随仓库与站点发布，供手动使用：从仓库根目录取用，或从 `https://<线上域名>/pre-install-tokens.sh`（Windows 为 `.ps1`）下载。文档不再提供远程一键运行的命令。
 
-# Windows
-iex "& { $(irm https://raw.githubusercontent.com/KunoLu/tokens/v1.0.5/pre-install-tokens.ps1) } -Site https://<线上域名>"
-```
-
-脚本 URL 指向不可变 ref（tag 或钉版 commit，永不跟随分支）。发版时 `scripts/set-version.sh <version>` 会先把 `web/src/lib/scriptsRef.ts` 的 `PINNED_SCRIPTS_REF` 推进为即将创建的 `v<version>`，并同步替换本手册与 README 的旧 ref——顺序固定为 set-version → commit → tag → deploy。不做 tag 扫描：历史 tag（v27.0.0/v27.0.1）不含 pre-install 脚本，扫到就是 404。部署侧紧急覆盖可用 `TOKENS_SCRIPTS_REF` env（只接受 `vX.Y.Z[-prerelease]` 或 40 位 SHA，非法值回退钉版）。脚本也会被站点 build 复制到 `https://<线上域名>/pre-install-tokens.sh` 作为备选下载路径。
+钉版说明：「见 CLI 手册」链接与发版流程共用一个钉版 ref。ref 值只存于 `web/src/lib/scriptsRef.ts` 的 `PINNED_SCRIPTS_REF`，本文档正文不写死 ref 值。发版时 `scripts/set-version.sh <version>` 把该值推进为即将创建的 `v<version>`，顺序固定为 set-version → commit → tag → deploy。部署侧紧急覆盖可用 `TOKENS_SCRIPTS_REF` env（只接受 `vX.Y.Z[-prerelease]` 或 40 位 SHA，非法值回退钉版）。
 
 **本地文件形式：**
 

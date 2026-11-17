@@ -1,7 +1,7 @@
-# tokens-cli "Frontend": npm Launcher Guidelines
+# @fitor/tokens-cli "Frontend": npm Launcher Guidelines
 
 > Trellis labels this layer "frontend", but `packages/cli/` is **not a UI**.
-> It is the `tokens-cli` npm package: a zero-dependency Node dispatcher that
+> It is the `@fitor/tokens-cli` npm package: a zero-dependency Node dispatcher that
 > resolves the prebuilt Rust binary for the current platform and executes it.
 > There are no components, hooks, or state management here.
 
@@ -9,11 +9,11 @@
 
 ## Overview
 
-- `packages/cli` (npm name `tokens-cli`) is the user-facing install:
-  `npm i -g tokens-cli` → `bin.js` → `dist/index.js` → `spawnSync(binary, argv)`.
+- `packages/cli` (npm name `@fitor/tokens-cli`) is the user-facing install:
+  `npm i -g @fitor/tokens-cli` → `bin.js` → `dist/index.js` → `spawnSync(binary, argv)`.
 - The real CLI is the Rust binary from `cli/tokens-cli/` (see
   `docs/spec/tokens-cli/backend/`).
-- Eight sibling packages `tokens-cli-<os>-<arch>` carry the prebuilt binaries;
+- Eight sibling packages `@fitor/tokens-cli-<os>-<arch>` carry the prebuilt binaries;
   the launcher pins all eight in `optionalDependencies` at the exact same
   version (`packages/cli/package.json:31-40`).
 
