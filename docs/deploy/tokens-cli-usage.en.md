@@ -117,10 +117,10 @@ Preview first: `--dry-run` (sh) or `-DryRun` (ps1) prints the install, logout, a
 
 ```bash
 # macOS / Linux (pinned ref, not a moving branch)
-curl -fsSL https://raw.githubusercontent.com/KunoLu/tokens/v1.0.4/pre-install-tokens.sh | bash -s -- https://<production-domain>
+curl -fsSL https://raw.githubusercontent.com/KunoLu/tokens/v1.0.5/pre-install-tokens.sh | bash -s -- https://<production-domain>
 
 # Windows
-iex "& { $(irm https://raw.githubusercontent.com/KunoLu/tokens/v1.0.4/pre-install-tokens.ps1) } -Site https://<production-domain>"
+iex "& { $(irm https://raw.githubusercontent.com/KunoLu/tokens/v1.0.5/pre-install-tokens.ps1) } -Site https://<production-domain>"
 ```
 
 The script URL points at an immutable ref (a tag or a pinned commit, never a branch). At release, `scripts/set-version.sh <version>` advances `PINNED_SCRIPTS_REF` in `web/src/lib/scriptsRef.ts` to the `v<version>` about to be created, and replaces the old ref in this manual and the READMEs. The order is fixed: set-version, commit, tag, deploy. It does not scan tags. Historical tags (`v27.0.0` / `v27.0.1`) do not contain the pre-install scripts, so a scan would 404. An emergency override is the `TOKENS_SCRIPTS_REF` env var. It accepts only `vX.Y.Z[-prerelease]` or a 40-character SHA; an invalid value falls back to the pin. The site build also copies the script to `https://<production-domain>/pre-install-tokens.sh` as an alternate download.

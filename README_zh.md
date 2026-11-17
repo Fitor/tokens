@@ -79,7 +79,7 @@ TOKENS_API_URL=https://<你的域名> tokens login --private   # 可选：隐藏
 每条命令都要带 `TOKENS_API_URL`（或在当前 shell 里 export 一次）——CLI 默认指向上游站，凭据也不记自己属于哪个站。仓库根目录还提供 `pre-install-tokens.sh` / `pre-install-tokens.ps1` 一键预安装脚本：装 CLI、清旧凭据、把默认指向固定到你的站。可直接从本仓库的 GitHub 公开地址远程执行（钉住审过的 tag 或 commit，不跟随分支漂移）：
 
 ```sh
-curl -fsSL https://raw.githubusercontent.com/KunoLu/tokens/v1.0.4/pre-install-tokens.sh | bash -s -- https://<你的域名>
+curl -fsSL https://raw.githubusercontent.com/KunoLu/tokens/v1.0.5/pre-install-tokens.sh | bash -s -- https://<你的域名>
 ```
 
 预装完成后，`enable-tokens-service.sh`（Linux）与 `register-tokens-submit-task.ps1`（Windows）可配置常驻自动提交——由你部署的站点提供下载，docs 页有现成命令，详见手册。

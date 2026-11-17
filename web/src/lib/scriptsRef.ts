@@ -5,7 +5,7 @@
  * 推进为 v<version>（set-version → commit → tag → deploy）；部署侧可用
  * TOKENS_SCRIPTS_REF 覆盖。永不用分支名——只钉不可变 ref。
  */
-export const PINNED_SCRIPTS_REF = "v1.0.4";
+export const PINNED_SCRIPTS_REF = "v1.0.5";
 
 const REF_PATTERN = /^(v\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?|[0-9a-f]{40})$/;
 

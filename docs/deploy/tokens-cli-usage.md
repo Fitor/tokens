@@ -114,10 +114,10 @@ TOKENS_API_URL=https://<线上域名> tokens submit
 
 ```bash
 # macOS / Linux（钉住 commit，不跟随分支漂移）
-curl -fsSL https://raw.githubusercontent.com/KunoLu/tokens/v1.0.4/pre-install-tokens.sh | bash -s -- https://<线上域名>
+curl -fsSL https://raw.githubusercontent.com/KunoLu/tokens/v1.0.5/pre-install-tokens.sh | bash -s -- https://<线上域名>
 
 # Windows
-iex "& { $(irm https://raw.githubusercontent.com/KunoLu/tokens/v1.0.4/pre-install-tokens.ps1) } -Site https://<线上域名>"
+iex "& { $(irm https://raw.githubusercontent.com/KunoLu/tokens/v1.0.5/pre-install-tokens.ps1) } -Site https://<线上域名>"
 ```
 
 脚本 URL 指向不可变 ref（tag 或钉版 commit，永不跟随分支）。发版时 `scripts/set-version.sh <version>` 会先把 `web/src/lib/scriptsRef.ts` 的 `PINNED_SCRIPTS_REF` 推进为即将创建的 `v<version>`，并同步替换本手册与 README 的旧 ref——顺序固定为 set-version → commit → tag → deploy。不做 tag 扫描：历史 tag（v27.0.0/v27.0.1）不含 pre-install 脚本，扫到就是 404。部署侧紧急覆盖可用 `TOKENS_SCRIPTS_REF` env（只接受 `vX.Y.Z[-prerelease]` 或 40 位 SHA，非法值回退钉版）。脚本也会被站点 build 复制到 `https://<线上域名>/pre-install-tokens.sh` 作为备选下载路径。

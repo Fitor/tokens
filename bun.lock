@@ -10,8 +10,8 @@
       },
     },
     "packages/cli": {
-      "name": "tokens-cli",
-      "version": "1.0.4",
+      "name": "@fitor/tokens-cli",
+      "version": "1.0.5",
       "bin": {
         "tokens": "./bin.js",
       },
@@ -20,47 +20,47 @@
         "typescript": "^5.0.0",
       },
       "optionalDependencies": {
-        "tokens-cli-darwin-arm64": "1.0.4",
-        "tokens-cli-darwin-x64": "1.0.4",
-        "tokens-cli-linux-arm64-gnu": "1.0.4",
-        "tokens-cli-linux-arm64-musl": "1.0.4",
-        "tokens-cli-linux-x64-gnu": "1.0.4",
-        "tokens-cli-linux-x64-musl": "1.0.4",
-        "tokens-cli-win32-arm64-msvc": "1.0.4",
-        "tokens-cli-win32-x64-msvc": "1.0.4",
+        "@fitor/tokens-cli-darwin-arm64": "1.0.5",
+        "@fitor/tokens-cli-darwin-x64": "1.0.5",
+        "@fitor/tokens-cli-linux-arm64-gnu": "1.0.5",
+        "@fitor/tokens-cli-linux-arm64-musl": "1.0.5",
+        "@fitor/tokens-cli-linux-x64-gnu": "1.0.5",
+        "@fitor/tokens-cli-linux-x64-musl": "1.0.5",
+        "@fitor/tokens-cli-win32-arm64-msvc": "1.0.5",
+        "@fitor/tokens-cli-win32-x64-msvc": "1.0.5",
       },
     },
     "packages/cli-darwin-arm64": {
-      "name": "tokens-cli-darwin-arm64",
-      "version": "1.0.4",
+      "name": "@fitor/tokens-cli-darwin-arm64",
+      "version": "1.0.5",
     },
     "packages/cli-darwin-x64": {
-      "name": "tokens-cli-darwin-x64",
-      "version": "1.0.4",
+      "name": "@fitor/tokens-cli-darwin-x64",
+      "version": "1.0.5",
     },
     "packages/cli-linux-arm64-gnu": {
-      "name": "tokens-cli-linux-arm64-gnu",
-      "version": "1.0.4",
+      "name": "@fitor/tokens-cli-linux-arm64-gnu",
+      "version": "1.0.5",
     },
     "packages/cli-linux-arm64-musl": {
-      "name": "tokens-cli-linux-arm64-musl",
-      "version": "1.0.4",
+      "name": "@fitor/tokens-cli-linux-arm64-musl",
+      "version": "1.0.5",
     },
     "packages/cli-linux-x64-gnu": {
-      "name": "tokens-cli-linux-x64-gnu",
-      "version": "1.0.4",
+      "name": "@fitor/tokens-cli-linux-x64-gnu",
+      "version": "1.0.5",
     },
     "packages/cli-linux-x64-musl": {
-      "name": "tokens-cli-linux-x64-musl",
-      "version": "1.0.4",
+      "name": "@fitor/tokens-cli-linux-x64-musl",
+      "version": "1.0.5",
     },
     "packages/cli-win32-arm64-msvc": {
-      "name": "tokens-cli-win32-arm64-msvc",
-      "version": "1.0.4",
+      "name": "@fitor/tokens-cli-win32-arm64-msvc",
+      "version": "1.0.5",
     },
     "packages/cli-win32-x64-msvc": {
-      "name": "tokens-cli-win32-x64-msvc",
-      "version": "1.0.4",
+      "name": "@fitor/tokens-cli-win32-x64-msvc",
+      "version": "1.0.5",
     },
     "web": {
       "name": "@tokens/web",
@@ -250,6 +250,24 @@
     "@eslint/object-schema": ["@eslint/object-schema@2.1.7", "", {}, "sha512-VtAOaymWVfZcmZbp6E2mympDIHvyjXs/12LqWYjVw6qjrfF+VK+fyG33kChz3nnK+SU5/NeHOqrTEHS8sXO3OA=="],
 
     "@eslint/plugin-kit": ["@eslint/plugin-kit@0.4.1", "", { "dependencies": { "@eslint/core": "^0.17.0", "levn": "^0.4.1" } }, "sha512-43/qtrDUokr7LJqoF2c3+RInu/t4zfrpYdoSDfYyhg52rwLV6TnOvdG4fXm7IkSB3wErkcmJS9iEhjVtOSEjjA=="],
+
+    "@fitor/tokens-cli": ["@fitor/tokens-cli@workspace:packages/cli"],
+
+    "@fitor/tokens-cli-darwin-arm64": ["@fitor/tokens-cli-darwin-arm64@workspace:packages/cli-darwin-arm64"],
+
+    "@fitor/tokens-cli-darwin-x64": ["@fitor/tokens-cli-darwin-x64@workspace:packages/cli-darwin-x64"],
+
+    "@fitor/tokens-cli-linux-arm64-gnu": ["@fitor/tokens-cli-linux-arm64-gnu@workspace:packages/cli-linux-arm64-gnu"],
+
+    "@fitor/tokens-cli-linux-arm64-musl": ["@fitor/tokens-cli-linux-arm64-musl@workspace:packages/cli-linux-arm64-musl"],
+
+    "@fitor/tokens-cli-linux-x64-gnu": ["@fitor/tokens-cli-linux-x64-gnu@workspace:packages/cli-linux-x64-gnu"],
+
+    "@fitor/tokens-cli-linux-x64-musl": ["@fitor/tokens-cli-linux-x64-musl@workspace:packages/cli-linux-x64-musl"],
+
+    "@fitor/tokens-cli-win32-arm64-msvc": ["@fitor/tokens-cli-win32-arm64-msvc@workspace:packages/cli-win32-arm64-msvc"],
+
+    "@fitor/tokens-cli-win32-x64-msvc": ["@fitor/tokens-cli-win32-x64-msvc@workspace:packages/cli-win32-x64-msvc"],
 
     "@floating-ui/core": ["@floating-ui/core@1.8.0", "", { "dependencies": { "@floating-ui/utils": "^0.2.12" } }, "sha512-0CIZ5itps/8x7BG8dEIhs53BvCUH2PCoogtakwRTut+Arm58sJooJ0AuZhLw2HJYIR5cMLNPBSS728sPho2khQ=="],
 
@@ -1352,24 +1370,6 @@
     "to-regex-range": ["to-regex-range@5.0.1", "", { "dependencies": { "is-number": "^7.0.0" } }, "sha512-65P7iz6X5yEr1cwcgvQxbbIw7Uk3gOy5dIdtZ4rDveLqhrdJP+Li/Hx6tyK0NEb+2GCyneCMJiGqrADCSNk8sQ=="],
 
     "toidentifier": ["toidentifier@1.0.1", "", {}, "sha512-o5sSPKEkg/DIQNmH43V0/uerLrpzVedkUh8tGNvaeXpfpuwjKenlSox/2O/BTlZUtEe+JG7s5YhEz608PlAHRA=="],
-
-    "tokens-cli": ["tokens-cli@workspace:packages/cli"],
-
-    "tokens-cli-darwin-arm64": ["tokens-cli-darwin-arm64@workspace:packages/cli-darwin-arm64"],
-
-    "tokens-cli-darwin-x64": ["tokens-cli-darwin-x64@workspace:packages/cli-darwin-x64"],
-
-    "tokens-cli-linux-arm64-gnu": ["tokens-cli-linux-arm64-gnu@workspace:packages/cli-linux-arm64-gnu"],
-
-    "tokens-cli-linux-arm64-musl": ["tokens-cli-linux-arm64-musl@workspace:packages/cli-linux-arm64-musl"],
-
-    "tokens-cli-linux-x64-gnu": ["tokens-cli-linux-x64-gnu@workspace:packages/cli-linux-x64-gnu"],
-
-    "tokens-cli-linux-x64-musl": ["tokens-cli-linux-x64-musl@workspace:packages/cli-linux-x64-musl"],
-
-    "tokens-cli-win32-arm64-msvc": ["tokens-cli-win32-arm64-msvc@workspace:packages/cli-win32-arm64-msvc"],
-
-    "tokens-cli-win32-x64-msvc": ["tokens-cli-win32-x64-msvc@workspace:packages/cli-win32-x64-msvc"],
 
     "ts-api-utils": ["ts-api-utils@2.1.0", "", { "peerDependencies": { "typescript": ">=4.8.4" } }, "sha512-CUgTZL1irw8u29bzrOD/nH85jqyc74D6SshFgujOIA7osm2Rz7dYH77agkx7H4FBNxDq7Cjf+IjaX/8zwFW+ZQ=="],
 

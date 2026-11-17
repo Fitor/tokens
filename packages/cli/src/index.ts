@@ -23,6 +23,7 @@ const isSubDir = dirName === "dist" || dirName === "src";
 const cliDir = isSubDir ? resolve(currentDir, "..") : currentDir;
 const parentDir = resolve(cliDir, "..");
 const workspaceRoot = resolve(parentDir, "..");
+const SCOPE = "@fitor";
 
 type LibcKind = "gnu" | "musl";
 
@@ -176,9 +177,9 @@ if (targetDir) {
     // npm/bun install: sibling package (node_modules/tokens-cli-<platform>/bin/...)
     join(parentDir, targetPackage, "bin", binaryName),
     // Nested node_modules: non-hoisted / pnpm (node_modules/tokens-cli/node_modules/tokens-cli-<platform>/bin/...)
-    join(cliDir, "node_modules", targetPackage, "bin", binaryName),
+    join(cliDir, "node_modules", SCOPE, targetPackage, "bin", binaryName),
     // Hoisted to the workspace-root node_modules
-    join(workspaceRoot, "node_modules", targetPackage, "bin", binaryName),
+    join(workspaceRoot, "node_modules", SCOPE, targetPackage, "bin", binaryName),
     // Monorepo development (packages/cli-<platform>/bin/...)
     join(workspaceRoot, "packages", targetDir, "bin", binaryName),
   );

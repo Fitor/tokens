@@ -53,7 +53,7 @@ for (const dir of dirs) {
   // exact version; they move together or the install picks nothing.
   if (pkg.optionalDependencies) {
     for (const name of Object.keys(pkg.optionalDependencies)) {
-      if (name.startsWith("tokens-cli-")) pkg.optionalDependencies[name] = version;
+      if (/^(?:@[^/]+\/)?tokens-cli-/.test(name)) pkg.optionalDependencies[name] = version;
     }
   }
   fs.writeFileSync(file, JSON.stringify(pkg, null, 2) + "\n");
