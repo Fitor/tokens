@@ -24,15 +24,15 @@
 | specs/trae-cn-local-scan/spec.md → schema 门禁 | 同构 DB 正常解析 | cli/tokens-core/src/sessions/trae_cn.rs (tests) | test_schema_gate_passes_isomorphic_db | 🟢 green |
 | specs/trae-cn-local-scan/spec.md → schema 门禁 | 缺列 DB 被跳过且告警 | cli/tokens-core/src/sessions/trae_cn.rs (tests) | test_schema_gate_missing_column_skips_with_warning | 🟢 green |
 | specs/trae-cn-local-scan/spec.md → schema 门禁 | 门禁通过但查询失败时跳过 | cli/tokens-core/src/sessions/trae_cn.rs (tests) | test_schema_gate_query_failure_skips | 🟢 green |
-| specs/trae-cn-local-scan/spec.md → 逐 turn 解析与归一化 | 含缓存拆分的 turn 正确归一化 | cli/tokens-core/src/sessions/trae_cn.rs (tests) | test_normalize_turn_with_cache_split | 🔴 red |
-| specs/trae-cn-local-scan/spec.md → 逐 turn 解析与归一化 | total 对账失败的行被跳过 | cli/tokens-core/src/sessions/trae_cn.rs (tests) | test_skip_total_mismatch_row | 🔴 red |
-| specs/trae-cn-local-scan/spec.md → 逐 turn 解析与归一化 | cacheRead 超过 prompt 的行被跳过 | cli/tokens-core/src/sessions/trae_cn.rs (tests) | test_skip_cache_read_exceeds_prompt | 🔴 red |
-| specs/trae-cn-local-scan/spec.md → 逐 turn 解析与归一化 | reasoning 超过 completion 的行被跳过 | cli/tokens-core/src/sessions/trae_cn.rs (tests) | test_skip_reasoning_exceeds_completion | 🔴 red |
-| specs/trae-cn-local-scan/spec.md → 逐 turn 解析与归一化 | 负 cache_read 的行被跳过 | cli/tokens-core/src/sessions/trae_cn.rs (tests) | test_skip_negative_cache_read | 🔴 red |
-| specs/trae-cn-local-scan/spec.md → 逐 turn 解析与归一化 | dev 后缀剥离 | cli/tokens-core/src/sessions/trae_cn.rs (tests) | test_strip_dev_suffix | 🔴 red |
-| specs/trae-cn-local-scan/spec.md → 逐 turn 解析与归一化 | 时间戳溢出的行被跳过 | cli/tokens-core/src/sessions/trae_cn.rs (tests) | test_skip_timestamp_overflow | 🔴 red |
-| specs/trae-cn-local-scan/spec.md → 逐 turn 解析与归一化 | session_title 保持为空 | cli/tokens-core/src/sessions/trae_cn.rs (tests) | test_session_title_stays_none | 🔴 red |
-| specs/trae-cn-local-scan/spec.md → 逐 turn 解析与归一化 | turn_id 缺失的行被跳过 | cli/tokens-core/src/sessions/trae_cn.rs (tests) | test_skip_missing_turn_id | 🔴 red |
+| specs/trae-cn-local-scan/spec.md → 逐 turn 解析与归一化 | 含缓存拆分的 turn 正确归一化 | cli/tokens-core/src/sessions/trae_cn.rs (tests) | test_normalize_turn_with_cache_split | 🟢 green |
+| specs/trae-cn-local-scan/spec.md → 逐 turn 解析与归一化 | total 对账失败的行被跳过 | cli/tokens-core/src/sessions/trae_cn.rs (tests) | test_skip_total_mismatch_row | 🟢 green |
+| specs/trae-cn-local-scan/spec.md → 逐 turn 解析与归一化 | cacheRead 超过 prompt 的行被跳过 | cli/tokens-core/src/sessions/trae_cn.rs (tests) | test_skip_cache_read_exceeds_prompt | 🟢 green |
+| specs/trae-cn-local-scan/spec.md → 逐 turn 解析与归一化 | reasoning 超过 completion 的行被跳过 | cli/tokens-core/src/sessions/trae_cn.rs (tests) | test_skip_reasoning_exceeds_completion | 🟢 green |
+| specs/trae-cn-local-scan/spec.md → 逐 turn 解析与归一化 | 负 cache_read 的行被跳过 | cli/tokens-core/src/sessions/trae_cn.rs (tests) | test_skip_negative_cache_read | 🟢 green |
+| specs/trae-cn-local-scan/spec.md → 逐 turn 解析与归一化 | dev 后缀剥离 | cli/tokens-core/src/sessions/trae_cn.rs (tests) | test_strip_dev_suffix | 🟢 green |
+| specs/trae-cn-local-scan/spec.md → 逐 turn 解析与归一化 | 时间戳溢出的行被跳过 | cli/tokens-core/src/sessions/trae_cn.rs (tests) | test_skip_timestamp_overflow | 🟢 green |
+| specs/trae-cn-local-scan/spec.md → 逐 turn 解析与归一化 | session_title 保持为空 | cli/tokens-core/src/sessions/trae_cn.rs (tests) | test_session_title_stays_none | 🟢 green |
+| specs/trae-cn-local-scan/spec.md → 逐 turn 解析与归一化 | turn_id 缺失的行被跳过 | cli/tokens-core/src/sessions/trae_cn.rs (tests) | test_skip_missing_turn_id | 🟢 green |
 | specs/trae-cn-local-scan/spec.md → 逐 turn 去重 | 同一 session 的多个 turn 全部保留 | cli/tokens-core/src/sessions/trae_cn.rs (tests) | test_dedupe_keeps_all_turns_in_session | 🔴 red |
 | specs/trae-cn-local-scan/spec.md → 逐 turn 去重 | 同一 turn 重复出现时取最新 | cli/tokens-core/src/sessions/trae_cn.rs (tests) | test_dedupe_same_turn_latest_updated_at_wins | 🔴 red |
 | specs/trae-cn-local-scan/spec.md → 逐 turn 去重 | 同一 session 两个不同 turn 其余字段全部相同仍保留两条 | cli/tokens-core/src/sessions/trae_cn.rs (tests) | test_dedupe_keeps_distinct_turns_with_identical_fields | 🔴 red |

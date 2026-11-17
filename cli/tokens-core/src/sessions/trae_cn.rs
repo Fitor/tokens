@@ -13,6 +13,9 @@ use std::path::Path;
 
 use rusqlite::{Connection, OpenFlags};
 
+use super::UnifiedMessage;
+use crate::TokenBreakdown;
+
 /// Columns the parser reads from `chat_turn`.
 const REQUIRED_COLUMNS: [&str; 7] = [
     "context",
@@ -109,6 +112,301 @@ fn probe_query(conn: &Connection) -> rusqlite::Result<()> {
     Ok(())
 }
 
+/// Maximum byte length accepted for the id and model fields.
+const MAX_FIELD_BYTES: usize = 256;
+
+/// Raw `chat_turn` values the parser reads for one row.
+pub struct TraeCnRow<'a> {
+    pub context: &'a str,
+    pub session_id: &'a str,
+    pub turn_id: Option<&'a str>,
+    pub created_at: i64,
+    pub updated_at: i64,
+    pub turn_status: &'a str,
+    pub deleted_at: i64,
+}
+
+/// Why one row produced no message.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum SkipReason {
+    NotCompleted,
+    Deleted,
+    InvalidContext,
+    MissingTokenUsage,
+    InvalidTokenField,
+    NegativeTokenField,
+    TotalMismatch,
+    CacheReadExceedsPrompt,
+    ReasoningExceedsCompletion,
+    MissingTurnId,
+    FieldTooLong,
+    TimestampOutOfRange,
+}
+
+/// One accepted row, ready for cross-database dedupe.
+#[derive(Debug, Clone)]
+pub struct ParsedTurn {
+    pub message: UnifiedMessage,
+    /// Validated `chat_turn.turn_id`. Stored beside the message until the shared
+    /// message layout gains its own field (task 7.2), so no cache format bump is
+    /// needed in between.
+    pub turn_id: String,
+    /// `chat_turn.updated_at` in milliseconds; `None` when missing or overflowing.
+    pub updated_at_ms: Option<i64>,
+}
+
+/// Convert one `chat_turn` row into a message, or the reason it is skipped.
+///
+/// The database is untrusted input: every rule here either produces a value
+/// backed by the row or skips the row. Nothing is clamped or guessed.
+pub fn parse_turn_row(row: &TraeCnRow<'_>) -> Result<ParsedTurn, SkipReason> {
+    if row.turn_status != "completed" {
+        return Err(SkipReason::NotCompleted);
+    }
+    if row.deleted_at > 0 {
+        return Err(SkipReason::Deleted);
+    }
+
+    let turn_id = row
+        .turn_id
+        .filter(|turn_id| !turn_id.is_empty())
+        .ok_or(SkipReason::MissingTurnId)?;
+    if row.session_id.len() > MAX_FIELD_BYTES || turn_id.len() > MAX_FIELD_BYTES {
+        return Err(SkipReason::FieldTooLong);
+    }
+
+    let timestamp = row
+        .created_at
+        .checked_mul(1000)
+        .filter(|timestamp| *timestamp > 0)
+        .ok_or(SkipReason::TimestampOutOfRange)?;
+    let updated_at_ms = row.updated_at.checked_mul(1000);
+
+    let context: serde_json::Value =
+        serde_json::from_str(row.context).map_err(|_| SkipReason::InvalidContext)?;
+    let usage = context
+        .get("token_usage")
+        .and_then(serde_json::Value::as_object)
+        .ok_or(SkipReason::MissingTokenUsage)?;
+
+    let prompt = token_field(usage, "prompt_tokens")?;
+    let completion = token_field(usage, "completion_tokens")?;
+    let cache_read = token_field(usage, "cache_read_input_tokens")?;
+    let reasoning = token_field(usage, "reasoning_tokens")?;
+    let total = token_field(usage, "total_tokens")?;
+
+    if total != prompt.checked_add(completion).ok_or(SkipReason::TotalMismatch)? {
+        return Err(SkipReason::TotalMismatch);
+    }
+    if cache_read > prompt {
+        return Err(SkipReason::CacheReadExceedsPrompt);
+    }
+    if reasoning > completion {
+        return Err(SkipReason::ReasoningExceedsCompletion);
+    }
+
+    let model_id = clean_model_id(context_model(&context));
+    if model_id.len() > MAX_FIELD_BYTES {
+        return Err(SkipReason::FieldTooLong);
+    }
+
+    let tokens = TokenBreakdown {
+        input: prompt - cache_read,
+        output: completion - reasoning,
+        cache_read,
+        cache_write: 0,
+        reasoning,
+    };
+    // `provider_id` stays empty until the model-family hint maps in task 8.2.
+    let message = UnifiedMessage::new(
+        "trae-cn",
+        model_id,
+        "",
+        row.session_id,
+        timestamp,
+        tokens,
+        0.0,
+    );
+
+    Ok(ParsedTurn {
+        message,
+        turn_id: turn_id.to_string(),
+        updated_at_ms,
+    })
+}
+
+/// One token bucket from `token_usage`.
+///
+/// Integers and integral floats are accepted; anything else, and any negative
+/// value, skips the row.
+fn token_field(
+    usage: &serde_json::Map<String, serde_json::Value>,
+    key: &str,
+) -> Result<i64, SkipReason> {
+    let number = match usage.get(key) {
+        Some(serde_json::Value::Number(number)) => number
+            .as_i64()
+            .or_else(|| {
+                number
+                    .as_f64()
+                    .filter(|value| value.is_finite() && value.fract() == 0.0)
+                    .and_then(|value| {
+                        (value >= i64::MIN as f64 && value <= i64::MAX as f64)
+                            .then_some(value as i64)
+                    })
+            })
+            .ok_or(SkipReason::InvalidTokenField)?,
+        _ => return Err(SkipReason::InvalidTokenField),
+    };
+    if number < 0 {
+        return Err(SkipReason::NegativeTokenField);
+    }
+    Ok(number)
+}
+
+/// The model name inside `context`, in the order the client writes it.
+fn context_model(context: &serde_json::Value) -> Option<&str> {
+    const PATHS: [&[&str]; 5] = [
+        &[
+            "persist_user_message_context",
+            "model_info",
+            "display_model_name",
+        ],
+        &["persist_user_message_context", "model_info", "model_name"],
+        &["model_name"],
+        &["model"],
+        &["agent_model"],
+    ];
+    PATHS.iter().find_map(|path| {
+        let mut value = context;
+        for key in *path {
+            value = value.get(*key)?;
+        }
+        value.as_str()
+    })
+}
+
+/// Strip the `__<channel>` suffix, lower-case the result, and fall back to
+/// `trae-unknown` when nothing survives.
+fn clean_model_id(raw: Option<&str>) -> String {
+    let base = raw
+        .unwrap_or_default()
+        .split("__")
+        .next()
+        .unwrap_or_default()
+        .trim();
+    let cleaned = base.to_ascii_lowercase();
+    if cleaned.is_empty() {
+        "trae-unknown".to_string()
+    } else {
+        cleaned
+    }
+}
+
+/// Result of parsing one plaintext snapshot.
+#[derive(Debug, Default)]
+pub struct TraeCnParse {
+    /// Accepted turns, in database row order.
+    pub turns: Vec<ParsedTurn>,
+    /// Rows rejected by a per-row rule.
+    pub skipped: usize,
+    /// Set when the whole database was skipped; nothing was parsed.
+    pub skip_reason: Option<String>,
+}
+
+/// Gate the snapshot, then convert every `chat_turn` row.
+pub fn parse_trae_cn_db(path: &Path) -> TraeCnParse {
+    let conn = match gate_and_open(path) {
+        TraeCnDatabase::Ready(conn) => conn,
+        TraeCnDatabase::Skipped(reason) => {
+            return TraeCnParse {
+                skip_reason: Some(reason),
+                ..TraeCnParse::default()
+            }
+        }
+    };
+
+    let mut stmt = match conn.prepare(
+        "SELECT context, session_id, turn_id, created_at, updated_at, turn_status, deleted_at \
+         FROM chat_turn",
+    ) {
+        Ok(stmt) => stmt,
+        Err(err) => return skip_whole_db(path, err),
+    };
+    let mut rows = match stmt.query([]) {
+        Ok(rows) => rows,
+        Err(err) => return skip_whole_db(path, err),
+    };
+
+    let mut parsed = TraeCnParse::default();
+    loop {
+        let row = match rows.next() {
+            Ok(Some(row)) => row,
+            Ok(None) => break,
+            Err(err) => return skip_whole_db(path, err),
+        };
+
+        let context: Option<String> = match row.get(0) {
+            Ok(value) => value,
+            Err(err) => return skip_whole_db(path, err),
+        };
+        let session_id: Option<String> = match row.get(1) {
+            Ok(value) => value,
+            Err(err) => return skip_whole_db(path, err),
+        };
+        let turn_id: Option<String> = match row.get(2) {
+            Ok(value) => value,
+            Err(err) => return skip_whole_db(path, err),
+        };
+        let created_at: Option<i64> = match row.get(3) {
+            Ok(value) => value,
+            Err(err) => return skip_whole_db(path, err),
+        };
+        let updated_at: Option<i64> = match row.get(4) {
+            Ok(value) => value,
+            Err(err) => return skip_whole_db(path, err),
+        };
+        let turn_status: Option<String> = match row.get(5) {
+            Ok(value) => value,
+            Err(err) => return skip_whole_db(path, err),
+        };
+        let deleted_at: Option<i64> = match row.get(6) {
+            Ok(value) => value,
+            Err(err) => return skip_whole_db(path, err),
+        };
+
+        let raw = TraeCnRow {
+            context: context.as_deref().unwrap_or_default(),
+            session_id: session_id.as_deref().unwrap_or_default(),
+            turn_id: turn_id.as_deref(),
+            created_at: created_at.unwrap_or(0),
+            updated_at: updated_at.unwrap_or(0),
+            turn_status: turn_status.as_deref().unwrap_or_default(),
+            deleted_at: deleted_at.unwrap_or(0),
+        };
+
+        match parse_turn_row(&raw) {
+            Ok(turn) => parsed.turns.push(turn),
+            Err(_) => parsed.skipped += 1,
+        }
+    }
+
+    parsed
+}
+
+fn skip_whole_db(path: &Path, err: rusqlite::Error) -> TraeCnParse {
+    let reason = format!("chat_turn query failed: {err}");
+    tracing::warn!(
+        path = %path.display(),
+        reason = %reason,
+        "skipping TRAE CN database"
+    );
+    TraeCnParse {
+        skip_reason: Some(reason),
+        ..TraeCnParse::default()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -141,6 +439,199 @@ mod tests {
             TraeCnDatabase::Skipped(reason) => reason,
             TraeCnDatabase::Ready(_) => panic!("expected the database to be skipped"),
         }
+    }
+
+    // ---- per-turn normalization -------------------------------------------------
+
+    fn usage_context(
+        prompt: i64,
+        completion: i64,
+        cache_read: i64,
+        reasoning: i64,
+        total: i64,
+        extra: &str,
+    ) -> String {
+        format!(
+            r#"{{"token_usage":{{"prompt_tokens":{prompt},"completion_tokens":{completion},"cache_read_input_tokens":{cache_read},"reasoning_tokens":{reasoning},"total_tokens":{total}}}{extra}}}"#
+        )
+    }
+
+    fn row<'a>(context: &'a str, turn_id: Option<&'a str>) -> TraeCnRow<'a> {
+        TraeCnRow {
+            context,
+            session_id: "s1",
+            turn_id,
+            created_at: 1_700_000_000,
+            updated_at: 1_700_000_005,
+            turn_status: "completed",
+            deleted_at: 0,
+        }
+    }
+
+    fn skip_of(context: &str, turn_id: Option<&str>) -> SkipReason {
+        parse_turn_row(&row(context, turn_id)).unwrap_err()
+    }
+
+    #[test]
+    fn test_normalize_turn_with_cache_split() {
+        let context = usage_context(
+            1000,
+            200,
+            800,
+            50,
+            1200,
+            r#","model_name":"deepseek-v4.1-flash""#,
+        );
+        let parsed = parse_turn_row(&row(&context, Some("turn-1"))).unwrap();
+
+        assert_eq!(
+            parsed.message.tokens,
+            crate::TokenBreakdown {
+                input: 200,
+                output: 150,
+                cache_read: 800,
+                cache_write: 0,
+                reasoning: 50,
+            }
+        );
+        assert_eq!(parsed.message.tokens.total(), 1200);
+        assert_eq!(parsed.message.client, "trae-cn");
+        assert_eq!(parsed.message.model_id, "deepseek-v4.1-flash");
+        assert_eq!(parsed.message.timestamp, 1_700_000_000_000);
+        assert_eq!(parsed.turn_id, "turn-1");
+        assert_eq!(parsed.updated_at_ms, Some(1_700_000_005_000));
+    }
+
+    #[test]
+    fn test_skip_total_mismatch_row() {
+        let context = usage_context(100, 10, 0, 0, 500, "");
+        assert_eq!(
+            skip_of(&context, Some("t1")),
+            SkipReason::TotalMismatch
+        );
+    }
+
+    #[test]
+    fn test_skip_cache_read_exceeds_prompt() {
+        let context = usage_context(100, 10, 200, 0, 110, "");
+        assert_eq!(
+            skip_of(&context, Some("t1")),
+            SkipReason::CacheReadExceedsPrompt
+        );
+    }
+
+    #[test]
+    fn test_skip_reasoning_exceeds_completion() {
+        let context = usage_context(100, 10, 0, 50, 110, "");
+        assert_eq!(
+            skip_of(&context, Some("t1")),
+            SkipReason::ReasoningExceedsCompletion
+        );
+    }
+
+    #[test]
+    fn test_skip_negative_cache_read() {
+        let context = usage_context(100, 10, -10, 0, 110, "");
+        assert_eq!(
+            skip_of(&context, Some("t1")),
+            SkipReason::NegativeTokenField
+        );
+    }
+
+    #[test]
+    fn test_skip_missing_turn_id() {
+        let context = usage_context(100, 10, 0, 0, 110, "");
+        assert_eq!(skip_of(&context, None), SkipReason::MissingTurnId);
+        assert_eq!(skip_of(&context, Some("")), SkipReason::MissingTurnId);
+    }
+
+    #[test]
+    fn test_strip_dev_suffix() {
+        let context = usage_context(
+            100,
+            10,
+            0,
+            0,
+            110,
+            r#","model_name":"DeepSeek-V4.1-Flash__dev""#,
+        );
+        let parsed = parse_turn_row(&row(&context, Some("t1"))).unwrap();
+        assert_eq!(parsed.message.model_id, "deepseek-v4.1-flash");
+    }
+
+    #[test]
+    fn test_skip_timestamp_overflow() {
+        let context = usage_context(100, 10, 0, 0, 110, "");
+        let mut input = row(&context, Some("t1"));
+        input.created_at = i64::MAX;
+        assert_eq!(
+            parse_turn_row(&input).unwrap_err(),
+            SkipReason::TimestampOutOfRange
+        );
+    }
+
+    #[test]
+    fn test_session_title_stays_none() {
+        let context = usage_context(
+            100,
+            10,
+            0,
+            0,
+            110,
+            r#","title":"my secret chat","session_title":"also secret""#,
+        );
+        let parsed = parse_turn_row(&row(&context, Some("t1"))).unwrap();
+        assert_eq!(parsed.message.session_title, None);
+    }
+
+    #[test]
+    fn test_skip_non_completed_and_deleted_rows() {
+        let context = usage_context(100, 10, 0, 0, 110, "");
+
+        let mut running = row(&context, Some("t1"));
+        running.turn_status = "running";
+        assert_eq!(parse_turn_row(&running).unwrap_err(), SkipReason::NotCompleted);
+
+        let mut deleted = row(&context, Some("t1"));
+        deleted.deleted_at = 1;
+        assert_eq!(parse_turn_row(&deleted).unwrap_err(), SkipReason::Deleted);
+    }
+
+    #[test]
+    fn test_parse_trae_cn_db_skips_invalid_rows_and_counts() {
+        let dir = TempDir::new().unwrap();
+        let path = dir.path().join("database.db");
+        let conn = Connection::open(&path).unwrap();
+        conn.execute_batch(
+            "CREATE TABLE chat_turn(context TEXT, session_id TEXT, turn_id TEXT, \
+             created_at INTEGER, updated_at INTEGER, turn_status TEXT, deleted_at INTEGER);",
+        )
+        .unwrap();
+        let valid = usage_context(100, 10, 0, 0, 110, "");
+        let mismatch = usage_context(100, 10, 0, 0, 999, "");
+        conn.execute(
+            "INSERT INTO chat_turn VALUES (?1, 's1', 't1', 1700000000, 1700000005, 'completed', 0)",
+            params![valid],
+        )
+        .unwrap();
+        conn.execute(
+            "INSERT INTO chat_turn VALUES (?1, 's1', 't2', 1700000000, 1700000005, 'completed', 0)",
+            params![mismatch],
+        )
+        .unwrap();
+        conn.execute(
+            "INSERT INTO chat_turn VALUES (?1, 's1', NULL, 1700000000, 1700000005, 'completed', 0)",
+            params![usage_context(100, 10, 0, 0, 110, "")],
+        )
+        .unwrap();
+        drop(conn);
+
+        let parsed = parse_trae_cn_db(&path);
+        assert_eq!(parsed.skip_reason, None);
+        assert_eq!(parsed.turns.len(), 1);
+        assert_eq!(parsed.turns[0].turn_id, "t1");
+        assert_eq!(parsed.skipped, 2);
+        assert_eq!(parsed.turns[0].message.tokens.total(), 110);
     }
 
     #[test]

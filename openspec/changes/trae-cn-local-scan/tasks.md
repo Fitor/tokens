@@ -37,9 +37,9 @@
 
 ## 6. 逐 turn 解析与归一化
 
-- [ ] 6.1 Write failing tests: `test_normalize_turn_with_cache_split`、`test_skip_total_mismatch_row`、`test_skip_cache_read_exceeds_prompt`、`test_skip_reasoning_exceeds_completion`、`test_skip_negative_cache_read`、`test_skip_missing_turn_id`、`test_strip_dev_suffix`、`test_skip_timestamp_overflow`、`test_session_title_stays_none`。
-- [ ] 6.2 Implement: 行过滤（completed、deleted_at<=0）、五字段非数值/负值跳行、total 对账、`input = prompt - cache_read`、reasoning 拆分、模型名清洗（剥 `__`、小写、`trae-unknown`、256 字节上限）、`turn_id` 非空校验（NULL/空跳行）并把已过校验的 `turn_id` 填入消息、`created_at` 秒转毫秒（`checked_mul`）、`session_title = None`、跳过计数。
-- [ ] 6.3 Refactor；全套测试保持绿。
+- [x] 6.1 Write failing tests: `test_normalize_turn_with_cache_split`、`test_skip_total_mismatch_row`、`test_skip_cache_read_exceeds_prompt`、`test_skip_reasoning_exceeds_completion`、`test_skip_negative_cache_read`、`test_skip_missing_turn_id`、`test_strip_dev_suffix`、`test_skip_timestamp_overflow`、`test_session_title_stays_none`。
+- [x] 6.2 Implement: 行过滤（completed、deleted_at<=0）、五字段非数值/负值跳行、total 对账、`input = prompt - cache_read`、reasoning 拆分、模型名清洗（剥 `__`、小写、`trae-unknown`、256 字节上限）、`turn_id` 非空校验（NULL/空跳行）并把已过校验的 `turn_id` 填入消息、`created_at` 秒转毫秒（`checked_mul`）、`session_title = None`、跳过计数。
+- [x] 6.3 Refactor；全套测试保持绿。
 
 ## 7. 逐 turn 去重
 
