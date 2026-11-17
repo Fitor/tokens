@@ -3381,6 +3381,30 @@ fn parse_all_messages_streaming<S: MessageSink>(
     let deduped_trae_messages = dedupe_latest_trae_messages(trae_messages);
     all_messages.extend(deduped_trae_messages);
 
+    // TRAE CN databases are decrypted per scan miss and cached by the original
+    // db+wal fingerprint. All databases merge before the turn dedupe runs.
+    let trae_cn_outcomes: Vec<CachedParseOutcome> = scan_result
+        .trae_cn_dbs
+        .par_iter()
+        .map(|path| {
+            load_or_parse_sqlite_source(
+                message_cache::CacheIdentity::for_client(ClientId::TraeCn),
+                path,
+                &source_cache,
+                pricing,
+                sessions::trae_cn::parse_trae_cn_database,
+            )
+        })
+        .collect();
+    let mut trae_cn_messages = Vec::new();
+    for outcome in trae_cn_outcomes {
+        trae_cn_messages.extend(outcome.messages);
+        if let Some(entry) = outcome.cache_entry {
+            source_cache.insert(entry);
+        }
+    }
+    all_messages.extend(sessions::trae_cn::dedupe_trae_cn_turns(trae_cn_messages));
+
     let codebuddy_outcomes: Vec<CachedParseOutcome> = scan_result
         .get(ClientId::CodeBuddy)
         .par_iter()
@@ -3575,6 +3599,19 @@ fn dedupe_latest_trae_messages(mut messages: Vec<UnifiedMessage>) -> Vec<Unified
             .then_with(|| a.timestamp.cmp(&b.timestamp))
     });
     deduped
+}
+
+/// The report flow's trae-cn lane: parse each database, merge, then dedupe.
+pub(crate) fn report_trae_cn_messages(scan_result: &scanner::ScanResult) -> Vec<ParsedMessage> {
+    let merged: Vec<UnifiedMessage> = scan_result
+        .trae_cn_dbs
+        .iter()
+        .flat_map(|path| sessions::trae_cn::parse_trae_cn_database(path))
+        .collect();
+    sessions::trae_cn::dedupe_trae_cn_turns(merged)
+        .into_iter()
+        .map(|message| unified_to_parsed(&message))
+        .collect()
 }
 
 fn partition_workbuddy_paths(paths: &[PathBuf]) -> (Vec<&PathBuf>, Vec<&PathBuf>) {
@@ -6218,6 +6255,11 @@ pub fn parse_local_clients(options: LocalParseOptions) -> Result<ParsedMessages,
     counts.set(ClientId::Trae, trae_count);
     messages.extend(trae_msgs);
 
+    let trae_cn_msgs = report_trae_cn_messages(&scan_result);
+    let trae_cn_count = summed_parsed_message_count(&trae_cn_msgs);
+    counts.set(ClientId::TraeCn, trae_cn_count);
+    messages.extend(trae_cn_msgs);
+
     let warp_msgs: Vec<ParsedMessage> = scan_result
         .get(ClientId::Warp)
         .par_iter()
@@ -6604,7 +6646,8 @@ mod tests {
         normalize_model_for_grouping, opencode_json_superseded_by_sqlite,
         parse_all_messages_with_pricing_with_cache_policy,
         parse_all_messages_with_pricing_with_env_strategy, parse_local_clients, parsed_to_unified,
-        paths, prepare_submission_pricing, pricing, retain_for_requested_clients, scanner,
+        paths, prepare_submission_pricing, pricing, report_trae_cn_messages,
+        retain_for_requested_clients, scanner,
         select_local_parse_pricing, sessions, unified_to_parsed, validate_priced_messages,
         ClientId, GraphPricingRequirement, GraphSink, GroupBy, LocalParseOptions, MessageSink,
         MonthlyReportV2, MonthlyUsage, MonthlyUsageV2, ReportOptions, SourceCachePolicy,
@@ -15698,6 +15741,217 @@ mod tests {
         assert!(zeroed.is_empty());
         assert!(unpriced_usage.is_empty());
         assert!(incomplete_dates.is_empty());
+    }
+
+    fn trae_cn_turn_sql(turn_id: &str, input: i64, updated_at: i64) -> String {
+        let total = input + 5;
+        format!(
+            "CREATE TABLE chat_turn(context TEXT, session_id TEXT, turn_id TEXT, created_at INTEGER, updated_at INTEGER, turn_status TEXT, deleted_at INTEGER);
+             INSERT INTO chat_turn VALUES ('{{\"token_usage\":{{\"prompt_tokens\":{input},\"completion_tokens\":5,\"cache_read_input_tokens\":0,\"reasoning_tokens\":0,\"total_tokens\":{total}}},\"model_name\":\"glm-5.2\"}}','s1','{turn_id}',1700000000,{updated_at},'completed',0);"
+        )
+    }
+
+    fn trae_cn_scan(home: &std::path::Path) -> Vec<UnifiedMessage> {
+        crate::parse_all_messages_with_pricing_with_env_strategy(
+            home.to_str().unwrap(),
+            &["trae-cn".to_string()],
+            None,
+            true,
+            &crate::scanner::ScannerSettings::default(),
+        )
+    }
+
+    fn trae_cn_root(
+        dir: &std::path::Path,
+        agent: (&str, i64, i64),
+        chat: (&str, i64, i64),
+    ) -> std::path::PathBuf {
+        let root = dir.join("trae-cn-home").join("Trae CN").join("ModularData");
+        let agent_dir = root.join("ai-agent");
+        let chat_dir = root.join("ai-chat");
+        std::fs::create_dir_all(&agent_dir).unwrap();
+        std::fs::create_dir_all(&chat_dir).unwrap();
+        crate::trae_db::tests::write_encrypted_db(
+            &agent_dir,
+            "database.db",
+            &trae_cn_turn_sql(agent.0, agent.1, agent.2),
+        );
+        crate::trae_db::tests::write_encrypted_db(
+            &chat_dir,
+            "database.db",
+            &trae_cn_turn_sql(chat.0, chat.1, chat.2),
+        );
+        dir.join("trae-cn-home")
+    }
+
+    #[test]
+    #[serial]
+    fn test_dedupe_cross_db_newest_wins_across_cache_and_order() {
+        const NEWER: i64 = 40;
+        const OLDER: i64 = 10;
+
+        let mut env = crate::paths::test_env::EnvGuard::capture(&[
+            "TOKENS_CONFIG_DIR",
+            "TOKENS_TRAE_CN_HOME",
+        ]);
+
+        // Arrange one root whose two module databases carry the same turn with
+        // different versions. A fresh config dir per arrangement keeps the
+        // "cold" cases genuinely cold.
+        let assert_newest = |messages: Vec<UnifiedMessage>, arrangement: &str| {
+            assert_eq!(messages.len(), 1, "{arrangement}: one turn only");
+            assert_eq!(
+                messages[0].tokens.input, NEWER,
+                "{arrangement}: the newer copy must win"
+            );
+            assert_eq!(messages[0].updated_at_ms, Some(1_700_000_200_000));
+        };
+
+        // 1. both cold
+        {
+            let config = tempfile::TempDir::new().unwrap();
+            env.set("TOKENS_CONFIG_DIR", config.path());
+            let home = tempfile::TempDir::new().unwrap();
+            let root = trae_cn_root(home.path(), ("t1", OLDER, 1_700_000_000), ("t1", NEWER, 1_700_000_200));
+            env.set("TOKENS_TRAE_CN_HOME", &root);
+            assert_newest(trae_cn_scan(&root), "both cold");
+        }
+
+        // 2. newer side warm, older side cold
+        {
+            let config = tempfile::TempDir::new().unwrap();
+            env.set("TOKENS_CONFIG_DIR", config.path());
+            let home = tempfile::TempDir::new().unwrap();
+            let root = trae_cn_root(home.path(), ("t1", OLDER, 1_700_000_000), ("t1", NEWER, 1_700_000_200));
+            env.set("TOKENS_TRAE_CN_HOME", &root);
+            let older_db = root.join("Trae CN/ModularData/ai-agent/database.db");
+            let hidden = home.path().join("hidden.db");
+            std::fs::rename(&older_db, &hidden).unwrap();
+            let _ = trae_cn_scan(&root);
+            std::fs::rename(&hidden, &older_db).unwrap();
+            assert_newest(trae_cn_scan(&root), "newer warm");
+        }
+
+        // 3. older side warm, newer side cold
+        {
+            let config = tempfile::TempDir::new().unwrap();
+            env.set("TOKENS_CONFIG_DIR", config.path());
+            let home = tempfile::TempDir::new().unwrap();
+            let root = trae_cn_root(home.path(), ("t1", OLDER, 1_700_000_000), ("t1", NEWER, 1_700_000_200));
+            env.set("TOKENS_TRAE_CN_HOME", &root);
+            let newer_db = root.join("Trae CN/ModularData/ai-chat/database.db");
+            let hidden = home.path().join("hidden.db");
+            std::fs::rename(&newer_db, &hidden).unwrap();
+            let _ = trae_cn_scan(&root);
+            std::fs::rename(&hidden, &newer_db).unwrap();
+            assert_newest(trae_cn_scan(&root), "older warm");
+        }
+
+        // 4. both warm
+        {
+            let config = tempfile::TempDir::new().unwrap();
+            env.set("TOKENS_CONFIG_DIR", config.path());
+            let home = tempfile::TempDir::new().unwrap();
+            let root = trae_cn_root(home.path(), ("t1", OLDER, 1_700_000_000), ("t1", NEWER, 1_700_000_200));
+            env.set("TOKENS_TRAE_CN_HOME", &root);
+            let _ = trae_cn_scan(&root);
+            assert_newest(trae_cn_scan(&root), "both warm");
+        }
+
+        // 5. discovery order swapped (newer in ai-agent, older in ai-chat)
+        {
+            let config = tempfile::TempDir::new().unwrap();
+            env.set("TOKENS_CONFIG_DIR", config.path());
+            let home = tempfile::TempDir::new().unwrap();
+            let root = trae_cn_root(home.path(), ("t1", NEWER, 1_700_000_200), ("t1", OLDER, 1_700_000_000));
+            env.set("TOKENS_TRAE_CN_HOME", &root);
+            assert_newest(trae_cn_scan(&root), "order swapped");
+        }
+    }
+
+    #[test]
+    #[serial]
+    fn test_cache_hit_does_not_reemit_bad_page_diag() {
+        let mut env = crate::paths::test_env::EnvGuard::capture(&[
+            "TOKENS_CONFIG_DIR",
+            "TOKENS_TRAE_CN_HOME",
+        ]);
+        let config = tempfile::TempDir::new().unwrap();
+        env.set("TOKENS_CONFIG_DIR", config.path());
+        let home = tempfile::TempDir::new().unwrap();
+        let root = home.path().join("trae-cn-home");
+        let agent_dir = root.join("Trae CN/ModularData/ai-agent");
+        std::fs::create_dir_all(&agent_dir).unwrap();
+
+        // A second table owns the trailing pages, so zeroing a bad page there
+        // leaves the chat_turn b-tree (and therefore the parsed messages) fine.
+        let sql = format!(
+            "{} CREATE TABLE notes(pad TEXT);
+             INSERT INTO notes SELECT hex(zeroblob(100)) FROM (WITH RECURSIVE c(x) AS (SELECT 1 UNION ALL SELECT x + 1 FROM c WHERE x < 200) SELECT x FROM c);",
+            trae_cn_turn_sql("t1", 10, 1700000000)
+        );
+        let db_path = crate::trae_db::tests::write_encrypted_db(&agent_dir, "database.db", &sql);
+        let mut bytes = std::fs::read(&db_path).unwrap();
+        let last_page = (bytes.len() / 4096 - 1) * 4096;
+        bytes[last_page] ^= 0x01;
+        std::fs::write(&db_path, &bytes).unwrap();
+        env.set("TOKENS_TRAE_CN_HOME", &root);
+
+        let mut tui = crate::tui_signal::TuiActiveGuard::capture();
+        tui.set(true);
+        let _ = crate::tui_signal::take_deferred_stderr_for_test();
+
+        let cold = trae_cn_scan(&root);
+        let cold_diag = crate::tui_signal::take_deferred_stderr_for_test();
+        assert_eq!(cold.len(), 1);
+        assert!(
+            cold_diag
+                .iter()
+                .any(|line| line.contains("unreadable page")),
+            "cold scan must report the bad page: {cold_diag:?}"
+        );
+
+        let warm = trae_cn_scan(&root);
+        let warm_diag = crate::tui_signal::take_deferred_stderr_for_test();
+        assert_eq!(warm.len(), 1);
+        assert!(
+            warm_diag
+                .iter()
+                .all(|line| !line.contains("unreadable page")),
+            "a cache hit must not re-emit the bad page count: {warm_diag:?}"
+        );
+    }
+
+    #[test]
+    #[serial]
+    fn test_dedupe_applies_after_merge_in_both_flows() {
+        const NEWER: i64 = 40;
+        const OLDER: i64 = 10;
+
+        let mut env = crate::paths::test_env::EnvGuard::capture(&[
+            "TOKENS_CONFIG_DIR",
+            "TOKENS_TRAE_CN_HOME",
+        ]);
+        let config = tempfile::TempDir::new().unwrap();
+        env.set("TOKENS_CONFIG_DIR", config.path());
+        let home = tempfile::TempDir::new().unwrap();
+        let root = trae_cn_root(home.path(), ("t1", OLDER, 1_700_000_000), ("t1", NEWER, 1_700_000_200));
+        env.set("TOKENS_TRAE_CN_HOME", &root);
+
+        let collected = trae_cn_scan(&root);
+        assert_eq!(collected.len(), 1, "collect flow dedupes after merging");
+        assert_eq!(collected[0].tokens.input, NEWER);
+
+        let scan_result = crate::scanner::ScanResult {
+            trae_cn_dbs: vec![
+                root.join("Trae CN/ModularData/ai-agent/database.db"),
+                root.join("Trae CN/ModularData/ai-chat/database.db"),
+            ],
+            ..Default::default()
+        };
+        let reported = report_trae_cn_messages(&scan_result);
+        assert_eq!(reported.len(), 1, "report flow dedupes after merging");
+        assert_eq!(reported[0].input, NEWER);
     }
 
     #[test]

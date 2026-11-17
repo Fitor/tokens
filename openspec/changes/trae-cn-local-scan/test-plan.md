@@ -19,7 +19,7 @@
 | specs/trae-cn-local-scan/spec.md → 解密快照 | 截断尾页 | cli/tokens-core/src/trae_db.rs (tests) | test_snapshot_truncated_tail_page_count | 🟢 green |
 | specs/trae-cn-local-scan/spec.md → 解密快照 | 已知答案：官方向量可解密且页 HMAC 通过、IV 篡改触发失败 | cli/tokens-core/src/trae_db.rs (tests) | test_kat_official_vector_decrypts_and_hmac_passes | 🟢 green |
 | specs/trae-cn-local-scan/spec.md → 坏页容忍与可见性 | 单个坏页不阻断扫描且计数可见 | cli/tokens-core/src/trae_db.rs (tests) | test_bad_page_continues_and_counts | 🟢 green |
-| specs/trae-cn-local-scan/spec.md → 坏页容忍与可见性 | 缓存命中扫描不重发坏页计数 | cli/tokens-core/src/lib.rs (tests) | test_cache_hit_does_not_reemit_bad_page_diag | 🔴 red |
+| specs/trae-cn-local-scan/spec.md → 坏页容忍与可见性 | 缓存命中扫描不重发坏页计数 | cli/tokens-core/src/lib.rs (tests) | test_cache_hit_does_not_reemit_bad_page_diag | 🟢 green |
 | specs/trae-cn-local-scan/spec.md → 坏页容忍与可见性 | 置零导致查询失败时跳过该 DB | cli/tokens-core/src/trae_db.rs (tests) | test_zeroed_interior_page_skips_db | 🟢 green |
 | specs/trae-cn-local-scan/spec.md → schema 门禁 | 同构 DB 正常解析 | cli/tokens-core/src/sessions/trae_cn.rs (tests) | test_schema_gate_passes_isomorphic_db | 🟢 green |
 | specs/trae-cn-local-scan/spec.md → schema 门禁 | 缺列 DB 被跳过且告警 | cli/tokens-core/src/sessions/trae_cn.rs (tests) | test_schema_gate_missing_column_skips_with_warning | 🟢 green |
@@ -43,17 +43,17 @@
 | specs/trae-cn-local-scan/spec.md → 消息缓存格式升级兼容 | 缓存独有历史升级后保留 | cli/tokens-core/src/message_cache.rs (tests) | test_upgrade_preserves_claude_cache_only_history | 🟢 green |
 | specs/trae-cn-local-scan/spec.md → 消息缓存格式升级兼容 | fork-5/V7/V8 按既有语义迁移且谱系门禁不变 | cli/tokens-core/src/message_cache.rs (tests) | test_fork5_v7_v8_migrations_keep_semantics_and_gates | 🟢 green |
 | specs/trae-cn-local-scan/spec.md → 消息缓存格式升级兼容 | V4/V6 维持 Stale 且 upstream V5 不作为支持输入 | cli/tokens-core/src/message_cache.rs (tests) | test_v4_v6_stale_guard_and_upstream_v5_rejected | 🟢 green |
-| specs/trae-cn-local-scan/spec.md → 逐 turn 去重 | 跨库重复 turn 在缓存与发现顺序各安排下保留最新且仅计一次 | cli/tokens-core/src/lib.rs (tests) | test_dedupe_cross_db_newest_wins_across_cache_and_order | 🔴 red |
-| specs/trae-cn-local-scan/spec.md → 逐 turn 去重 | 两条流程合并后均执行去重 | cli/tokens-core/src/lib.rs (tests) | test_dedupe_applies_after_merge_in_both_flows | 🔴 red |
+| specs/trae-cn-local-scan/spec.md → 逐 turn 去重 | 跨库重复 turn 在缓存与发现顺序各安排下保留最新且仅计一次 | cli/tokens-core/src/lib.rs (tests) | test_dedupe_cross_db_newest_wins_across_cache_and_order | 🟢 green |
+| specs/trae-cn-local-scan/spec.md → 逐 turn 去重 | 两条流程合并后均执行去重 | cli/tokens-core/src/lib.rs (tests) | test_dedupe_applies_after_merge_in_both_flows | 🟢 green |
 | specs/trae-cn-local-scan/spec.md → 成本归属 | 已覆盖模型直接命中上游数据集 | cli/tokens-core/src/pricing/mod.rs (tests) | test_deepseek_v4_flash_first_party_resolves | 🟢 green |
 | specs/trae-cn-local-scan/spec.md → 成本归属 | doubao 模型映射到 volcengine 提示 | cli/tokens-core/src/sessions/trae_cn.rs (tests) | test_doubao_model_maps_to_volcengine_hint | 🟢 green |
 | specs/trae-cn-local-scan/spec.md → 成本归属 | Archive 费率对转售商行保持优先 | cli/tokens-core/src/pricing/mod.rs (tests) | test_archive_volcengine_doubao_beats_reseller | 🟢 green |
 | specs/trae-cn-local-scan/spec.md → 成本归属 | 无法定价的模型不谎报成本 | cli/tokens-core/src/lib.rs (tests) | test_unpriced_trae_cn_model_marks_incomplete_date | 🟢 green |
-| specs/trae-cn-local-scan/spec.md → 客户端注册与上报 | 默认提交包含 trae-cn | cli/tokens-core/tests/trae_cn_submit.rs | test_submit_default_includes_trae_cn | 🔴 red |
+| specs/trae-cn-local-scan/spec.md → 客户端注册与上报 | 默认提交包含 trae-cn | cli/tokens-core/tests/trae_cn_submit.rs | test_submit_default_includes_trae_cn | 🟢 green |
 | specs/trae-cn-local-scan/spec.md → 客户端注册与上报 | 服务端白名单接受新客户端 | web/src/lib/types.ts（CI 机械校验：`grep '"trae-cn"' web/src/lib/types.ts`） | supported-client-types-contains-trae-cn | N/A — non-executable |
 | specs/trae-cn-local-scan/spec.md → 国际版集成不变 | 国际版既有测试保持通过 | cli（`cargo test -p tokens-core trae && cargo test -p tokens-cli trae` + `git diff --exit-code` on 两个冻结文件） | existing_trae_suite_green_and_unmodified | 🔴 red |
-| specs/trae-cn-local-scan/spec.md → 国际版集成不变 | 国际版 ClientDef 条目逐字段不变 | cli/tokens-core/src/clients.rs (tests) | test_trae_clientdef_fields_unchanged | 🔴 red |
-| specs/trae-cn-local-scan/spec.md → 国际版集成不变 | 两个客户端数据并存 | cli/tokens-core/tests/trae_cn_submit.rs | test_trae_and_trae_cn_coexist | 🔴 red |
+| specs/trae-cn-local-scan/spec.md → 国际版集成不变 | 国际版 ClientDef 条目逐字段不变 | cli/tokens-core/src/clients.rs (tests) | test_trae_clientdef_fields_unchanged | 🟢 green |
+| specs/trae-cn-local-scan/spec.md → 国际版集成不变 | 两个客户端数据并存 | cli/tokens-core/tests/trae_cn_submit.rs | test_trae_and_trae_cn_coexist | 🟢 green |
 
 ## Coverage Notes
 

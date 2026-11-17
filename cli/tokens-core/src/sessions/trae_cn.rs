@@ -380,6 +380,54 @@ fn full_message_key(message: &UnifiedMessage) -> Vec<u8> {
     bincode::serialize(message).unwrap_or_default()
 }
 
+/// Snapshot one encrypted TRAE CN database and parse it.
+///
+/// This is the parse closure the lane hands to the shared SQLite loader, so it
+/// only runs on a cache miss: a warm scan neither decrypts nor reprints the
+/// diagnostics below. The snapshot is removed before returning.
+pub fn parse_trae_cn_database(db_path: &Path) -> Vec<UnifiedMessage> {
+    let tmp_dir = crate::trae_db::snapshot_tmp_dir();
+    if let Err(err) = crate::trae_db::sweep_stale_snapshots(&tmp_dir) {
+        crate::tui_signal::emit_or_defer_stderr(format!(
+            "tokens: TRAE CN snapshot sweep skipped for {}: {err}",
+            tmp_dir.display()
+        ));
+    }
+
+    let snapshot = match crate::trae_db::create_snapshot(
+        db_path,
+        &crate::trae_db::default_key(),
+        &tmp_dir,
+    ) {
+        Ok(snapshot) => snapshot,
+        Err(err) => {
+            crate::tui_signal::emit_or_defer_stderr(format!(
+                "tokens: skipping TRAE CN database {}: {err}",
+                db_path.display()
+            ));
+            return Vec::new();
+        }
+    };
+
+    if snapshot.stats.bad_pages > 0 {
+        crate::tui_signal::emit_or_defer_stderr(format!(
+            "tokens: TRAE CN database {}: {} unreadable page(s) zeroed in the snapshot",
+            db_path.display(),
+            snapshot.stats.bad_pages
+        ));
+    }
+
+    let parsed = parse_trae_cn_db(&snapshot.path);
+    if let Some(reason) = parsed.skip_reason {
+        crate::tui_signal::emit_or_defer_stderr(format!(
+            "tokens: skipping TRAE CN database {}: {reason}",
+            db_path.display()
+        ));
+    }
+    let _ = std::fs::remove_file(&snapshot.path);
+    parsed.messages
+}
+
 /// Result of parsing one plaintext snapshot.
 #[derive(Debug, Default)]
 pub struct TraeCnParse {

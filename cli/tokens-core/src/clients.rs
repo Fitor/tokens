@@ -1071,6 +1071,21 @@ define_clients!(
         headless: false,
         parse_local: true,
         submit_default: true
+    },
+    // TRAE CN keeps its usage in encrypted SQLCipher databases discovered by
+    // `scanner::discover_trae_cn_databases`, so this entry carries no usable
+    // path of its own; it exists for the client id, the filter list and
+    // `submit_default`.
+    TraeCn = 54 => {
+        id: "trae-cn",
+        display: "Trae CN",
+        logo: None,
+        root: PathRoot::Config,
+        relative: "trae-cn-cache",
+        pattern: "*.db",
+        headless: false,
+        parse_local: true,
+        submit_default: true
     }
 );
 
@@ -1186,8 +1201,28 @@ mod tests {
 
     #[test]
     fn test_client_id_count() {
-        // 53 upstream clients plus this fork's Craft Agent.
-        assert_eq!(ClientId::COUNT, 54);
+        // 53 upstream clients plus this fork's Craft Agent and Trae CN.
+        assert_eq!(ClientId::COUNT, 55);
+    }
+
+    #[test]
+    fn test_trae_clientdef_fields_unchanged() {
+        // The international client must keep every field it had before the CN
+        // variant was registered; the CN client is a separate entry.
+        let trae = ClientId::Trae.data();
+        assert_eq!(trae.id, "trae");
+        let resolved = trae.resolve_path("/tmp/home");
+        assert!(resolved.ends_with("trae-cache/sessions"), "{resolved}");
+        assert_eq!(trae.pattern, "*.json");
+        assert!(!trae.headless);
+        assert!(trae.parse_local);
+        assert!(!trae.submit_default);
+
+        let cn = ClientId::TraeCn.data();
+        assert_eq!(cn.id, "trae-cn");
+        assert!(cn.submit_default);
+        assert!(cn.parse_local);
+        assert!(!cn.headless);
     }
 
     #[test]

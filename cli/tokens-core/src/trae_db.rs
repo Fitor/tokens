@@ -709,7 +709,7 @@ fn wal_checksum(data: &[u8], seed: (u32, u32), big_endian: bool) -> (u32, u32) {
 }
 
 #[cfg(test)]
-mod tests {
+pub(crate) mod tests {
     use super::*;
     use aes::cipher::BlockEncryptMut;
     use rusqlite::{Connection, OpenFlags};
@@ -903,6 +903,14 @@ mod tests {
             fs::write(wal_path_for(&db_path), bytes).unwrap();
         }
         db_path
+    }
+
+    /// Write a plain encrypted database holding `sql`, for cross-module tests.
+    pub(crate) fn write_encrypted_db(dir: &Path, name: &str, sql: &str) -> PathBuf {
+        let key = default_key();
+        let kdf_salt = test_kdf_salt();
+        let pages = plain_pages(dir, name, sql);
+        write_fixture(dir, &pages, None, &key, &kdf_salt)
     }
 
     /// The main database holds one turn; the committed WAL replaces it with a

@@ -55,9 +55,9 @@
 
 ## 9. 客户端注册与管线接入
 
-- [ ] 9.1 Write failing tests: `test_trae_clientdef_fields_unchanged`（硬编码 `trae` 七字段现值）、`test_submit_default_includes_trae_cn`、`test_trae_and_trae_cn_coexist`；更新 `clients.rs` 既有 `COUNT == 54` 断言为 55（注册新变体的伴随修改，非冻结文件）。
-- [ ] 9.2 Implement: `ClientId::TraeCn = 54` + `ClientDef{id:"trae-cn", submit_default:true}` + `ClientFilter` 变体 + `sessions/mod.rs` 导出 + `message_cache.rs` parser 版本表加臂；`lib.rs` 两条流程各加 trae-cn lane（collect 流 + ParsedMessage 流），解析走 `load_or_parse_sqlite_source`（CacheIdentity + `check_sqlite_path` 盯原始 db+wal），坏页统计在生成快照的扫描中由解析闭包直接打 stderr。
-- [ ] 9.3 Refactor；全套测试保持绿。
+- [x] 9.1 Write failing tests: `test_trae_clientdef_fields_unchanged`（硬编码 `trae` 七字段现值）、`test_submit_default_includes_trae_cn`、`test_trae_and_trae_cn_coexist`；更新 `clients.rs` 既有 `COUNT == 54` 断言为 55（注册新变体的伴随修改，非冻结文件）。
+- [x] 9.2 Implement: `ClientId::TraeCn = 54` + `ClientDef{id:"trae-cn", submit_default:true}` + `ClientFilter` 变体 + `sessions/mod.rs` 导出 + `message_cache.rs` parser 版本表加臂；`lib.rs` 两条流程各加 trae-cn lane（collect 流 + ParsedMessage 流），解析走 `load_or_parse_sqlite_source`（CacheIdentity + `check_sqlite_path` 盯原始 db+wal），坏页统计在生成快照的扫描中由解析闭包直接打 stderr。
+- [x] 9.3 Refactor；全套测试保持绿。
 
 ## 10. web 白名单（机械校验）
 
