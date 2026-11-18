@@ -1,8 +1,9 @@
 # register-tokens-submit-task.ps1 — 在已指向自建站的 Windows 机器上注册定时提交任务。
 #
 # 做的事：
-#   1. 用 Get-Command 解析 tokens 的绝对路径（与 pre-install-tokens.ps1 同一查找，
-#      不依赖计划任务继承 PATH）；
+#   1. 用 Get-Command 解析 tokens 的绝对路径并收敛为单一可执行路径（npm 在
+#      Windows 会生成多个入口，与 pre-install-tokens.ps1 同一查找，不依赖计划
+#      任务继承 PATH）；
 #   2. 写常驻 runner（%LOCALAPPDATA%\tokens\tokens-submit.ps1）：内设
 #      TOKENS_API_URL，再调绝对路径 submit；
 #   3. 注册计划任务（默认每 30 分钟），任务不加载 PowerShell profile，所以
@@ -55,7 +56,18 @@ if ($IntervalMinutes -lt 5) {
 
 Write-Host "==> 目标站点：$Site（每 $IntervalMinutes 分钟提交一次）"
 
-$tokensCmd = Get-Command tokens -CommandType Application -ErrorAction SilentlyContinue
+# --- 把 Get-Command 的多结果收敛为单一可执行路径（与 pre-install-tokens.ps1 同款） ---
+# npm 在 Windows 上会生成多个入口（tokens.cmd、无扩展名 shim、tokens.ps1），
+# Get-Command 一次返回多个结果；必须收敛为单一路径再写进 runner。
+function Select-TokensCommand {
+    param($Commands)
+    $list = @($Commands)
+    $picked = $list | Where-Object { $_.Name -like '*.cmd' } | Select-Object -First 1
+    if ($picked) { return $picked }
+    return $list[0]
+}
+
+$tokensCmd = Select-TokensCommand (Get-Command tokens -CommandType Application -ErrorAction SilentlyContinue)
 if (-not $tokensCmd) {
     Write-Error "未找到 tokens CLI——先跑 pre-install-tokens.ps1"
     exit 1

@@ -14,6 +14,7 @@ import path from "node:path";
 const ROOT = path.resolve(import.meta.dir, "../..");
 const SH_SCRIPT = path.join(ROOT, "pre-install-tokens.sh");
 const PS1_SCRIPT = path.join(ROOT, "pre-install-tokens.ps1");
+const REGISTER_PS1_SCRIPT = path.join(ROOT, "register-tokens-submit-task.ps1");
 const SITE = "https://example.com";
 const ALIAS_LINE = `alias tokens='TOKENS_API_URL=${SITE} tokens'`;
 
@@ -203,6 +204,80 @@ describe("pre-install-tokens.ps1 安装通道（机械检查）", () => {
     const text = ps1Text();
     expect(text).toMatch(/没有 npm 可用|未找到 npm|Get-Command npm/);
     expect(text).toContain("Node.js");
+  });
+});
+
+describe("ps1 解析 tokens 路径收敛（机械检查）", () => {
+  // npm 在 Windows 上生成多个入口（tokens.cmd、无扩展名 shim、tokens.ps1），
+  // Get-Command 返回多个结果；两份 ps1 都必须把结果收敛为单一可执行路径。
+  const ps1Texts = (): Array<{ name: string; text: string }> =>
+    [PS1_SCRIPT, REGISTER_PS1_SCRIPT].map((p) => ({ name: path.basename(p), text: readFileSync(p, "utf8") }));
+
+  test("ps1 单选逻辑含数组化与 .cmd 优先筛选（机械检查）", () => {
+    const missing: string[] = [];
+    for (const { name, text } of ps1Texts()) {
+      if (!text.includes("@($")) missing.push(`${name}: 缺 @() 数组化`);
+      if (!text.includes("-like '*.cmd'")) missing.push(`${name}: 缺 -like '*.cmd' 优先筛选`);
+    }
+    expect(missing).toEqual([]);
+  });
+
+  test("ps1 单选逻辑含 .cmd 未命中时取首项的回退分支（机械检查）", () => {
+    // 回退形态：命中 .cmd 即返回单值；未命中时对数组取第一项（[0]）。
+    const hitBranch = /if \(\$\w+\) \{ return \$\w+ \}/;
+    const fallback = /return \$\w+\[0\]/;
+    const missing: string[] = [];
+    for (const { name, text } of ps1Texts()) {
+      if (!hitBranch.test(text)) missing.push(`${name}: 缺 .cmd 命中即返回单值的分支`);
+      if (!fallback.test(text)) missing.push(`${name}: 缺 .cmd 未命中时取数组第一项 [0] 的回退分支`);
+    }
+    expect(missing).toEqual([]);
+  });
+
+  test("ps1 每个 Get-Command 解析点都过 Select-TokensCommand 且下游只用单值（机械检查）", () => {
+    // 计数锚点（test-plan Coverage Notes）：按调用形态 `= Select-TokensCommand (Get-Command tokens`
+    // 统计，不裸数 `Select-TokensCommand` 字符串——`function Select-TokensCommand {` 定义行会混入。
+    const callForm = /= Select-TokensCommand \(Get-Command tokens/g;
+    const resolvePoint = /Get-Command tokens -CommandType Application/g;
+    const count = (text: string, re: RegExp) => text.match(re)?.length ?? 0;
+
+    const issues: string[] = [];
+    let resolveTotal = 0;
+    let callTotal = 0;
+    for (const { name, text } of ps1Texts()) {
+      const resolvePoints = count(text, resolvePoint);
+      const calls = count(text, callForm);
+      resolveTotal += resolvePoints;
+      callTotal += calls;
+      if (resolvePoints !== calls) {
+        issues.push(`${name}: ${resolvePoints} 个 Get-Command 解析点，只有 ${calls} 个过 Select-TokensCommand`);
+      }
+      if (!text.includes("function Select-TokensCommand")) {
+        issues.push(`${name}: 缺 Select-TokensCommand 定义`);
+      }
+      // 下游只用单值：目标路径赋值引用收敛后的 $tokensCmd.Source。
+      for (const v of ["$targetBinary", "$escapedTokensPath"]) {
+        const line = text.split("\n").find((l) => l.trimStart().startsWith(`${v} =`));
+        if (line && !line.includes("$tokensCmd.Source")) {
+          issues.push(`${name}: ${v} 赋值行未引用收敛后的 $tokensCmd.Source`);
+        }
+      }
+    }
+    if (resolveTotal !== 3) issues.push(`两份合计 Get-Command 解析点 ${resolveTotal} 个，预期 3`);
+    if (callTotal !== 3) issues.push(`两份合计收敛调用 ${callTotal} 个，预期 3`);
+    expect(issues).toEqual([]);
+  });
+
+  // 护栏行：行为保持测试，改动前后都必须绿（test-plan「🟢 green（护栏）」）。
+  test("web/public 分发副本与仓库根一致", () => {
+    const mismatches: string[] = [];
+    for (const script of [PS1_SCRIPT, REGISTER_PS1_SCRIPT]) {
+      const distCopy = path.join(ROOT, "web/public", path.basename(script));
+      // 任一副本缺失（如未构建的 fresh clone）跳过该对，不算失败。
+      if (!existsSync(script) || !existsSync(distCopy)) continue;
+      if (!readFileSync(script).equals(readFileSync(distCopy))) mismatches.push(path.basename(script));
+    }
+    expect(mismatches).toEqual([]);
   });
 });
 

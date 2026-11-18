@@ -40,8 +40,21 @@ if ($Site -notmatch '^https://[A-Za-z0-9.-]+(:[0-9]+)?$' -and $Site -notmatch '^
 # 在任何改动（logout / profile 写入）之前，先让用户看到目标站点。
 Write-Host "==> 目标站点：$Site"
 
+# --- 0. 把 Get-Command 的多结果收敛为单一可执行路径 ------------------------
+# npm 在 Windows 上会生成多个入口（tokens.cmd、无扩展名 shim、tokens.ps1），
+# Get-Command 一次返回多个 ApplicationInfo，直接插值会把多个路径拼成无效串。
+# 这里先数组化，优先 *.cmd（Windows PowerShell 5.1 / PowerShell 7 / cmd 都能调）；
+# 没有 .cmd（Linux/macOS 的 pwsh）时取数组第一项。只用 PS 5.1 兼容语法。
+function Select-TokensCommand {
+    param($Commands)
+    $list = @($Commands)
+    $picked = $list | Where-Object { $_.Name -like '*.cmd' } | Select-Object -First 1
+    if ($picked) { return $picked }
+    return $list[0]
+}
+
 # --- 1. 检测 / 安装 tokens CLI -------------------------------------------
-$tokensCmd = Get-Command tokens -CommandType Application -ErrorAction SilentlyContinue
+$tokensCmd = Select-TokensCommand (Get-Command tokens -CommandType Application -ErrorAction SilentlyContinue)
 if ($tokensCmd) {
     Write-Host "✓ tokens CLI 已安装：$($tokensCmd.Source)"
 } elseif ($DryRun) {
@@ -53,7 +66,7 @@ if ($tokensCmd) {
         exit 1
     }
     npm i -g @fitor/tokens-cli
-    $tokensCmd = Get-Command tokens -CommandType Application -ErrorAction SilentlyContinue
+    $tokensCmd = Select-TokensCommand (Get-Command tokens -CommandType Application -ErrorAction SilentlyContinue)
     if (-not $tokensCmd) { Write-Error "安装后仍找不到 tokens，请重开终端后重试"; exit 1 }
     Write-Host "✓ tokens CLI 安装完成：$($tokensCmd.Source)"
 }

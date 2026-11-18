@@ -4,9 +4,9 @@
 
 | Requirement | Scenario | Test File | Test Name | Initial State |
 |-------------|----------|-----------|-----------|---------------|
-| specs/cli-install/spec.md → 脚本解析 tokens 路径必须收敛为单一路径 | 两份 ps1 含优先 .cmd 与回退首项的单选逻辑（机械检查） | tests/scripts/install-via-npm.test.ts | ps1 单选逻辑含数组化与 .cmd 优先筛选（机械检查） | 🔴 red |
-| specs/cli-install/spec.md → 脚本解析 tokens 路径必须收敛为单一路径 | 回退分支覆盖无 .cmd 的环境（机械检查） | tests/scripts/install-via-npm.test.ts | ps1 单选逻辑含 .cmd 未命中时取首项的回退分支（机械检查） | 🔴 red |
-| specs/cli-install/spec.md → 脚本解析 tokens 路径必须收敛为单一路径 | 每个 Get-Command 解析点都完成收敛（机械检查） | tests/scripts/install-via-npm.test.ts | ps1 每个 Get-Command 解析点都过 Select-TokensCommand 且下游只用单值（机械检查） | 🔴 red |
+| specs/cli-install/spec.md → 脚本解析 tokens 路径必须收敛为单一路径 | 两份 ps1 含优先 .cmd 与回退首项的单选逻辑（机械检查） | tests/scripts/install-via-npm.test.ts | ps1 单选逻辑含数组化与 .cmd 优先筛选（机械检查） | 🟢 green |
+| specs/cli-install/spec.md → 脚本解析 tokens 路径必须收敛为单一路径 | 回退分支覆盖无 .cmd 的环境（机械检查） | tests/scripts/install-via-npm.test.ts | ps1 单选逻辑含 .cmd 未命中时取首项的回退分支（机械检查） | 🟢 green |
+| specs/cli-install/spec.md → 脚本解析 tokens 路径必须收敛为单一路径 | 每个 Get-Command 解析点都完成收敛（机械检查） | tests/scripts/install-via-npm.test.ts | ps1 每个 Get-Command 解析点都过 Select-TokensCommand 且下游只用单值（机械检查） | 🟢 green |
 | specs/cli-install/spec.md → 脚本解析 tokens 路径必须收敛为单一路径 | 根目录副本与 web/public 分发副本一致 | tests/scripts/install-via-npm.test.ts | web/public 分发副本与仓库根一致 | 🟢 green（护栏） |
 
 ## Coverage Notes
