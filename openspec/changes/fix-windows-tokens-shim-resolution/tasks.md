@@ -11,13 +11,9 @@
 - [ ] 2.1 Implement: 同步工作区 `web/public/` 两份副本（与 `web/package.json` build 的 cp 同源拷贝）。根脚本改动后护栏短暂转红，此步回绿。
 - [ ] 2.2 Add regression guard:「web/public 分发副本与仓库根一致」（test-plan 第四行，护栏）。逐字节比较每对文件，任一副本缺失跳过该对。确认基线即绿（2.1 之后）。
 
-## 3. 站方指南
+## 3. 验证汇总
 
-- [ ] 3.1 Implement: 指南 `接入Tokens排行榜操作指南.md` §5.1 顶部加自愈提示：重跑 3.1/3.3 通常直接修复（脚本幂等替换 function 块与 runner）；注明重跑 3.1 会真实登出，需再走 3.2 重新登录，否则提交 401（衔接 §5.2；review round-2 S1）。手工修复步骤保留。指南未入库，编辑不进 change 提交（design D7）。
-
-## 4. 验证汇总
-
-- [ ] 4.1 Run: `bun test tests/scripts/install-via-npm.test.ts` 全绿（新增 4 个命名测试 + 既有 13 个）。
-- [ ] 4.2 Run: 仓库根 `bun test` 全量，无回归。
-- [ ] 4.3 Run: `openspec validate fix-windows-tokens-shim-resolution` 通过。
-- [ ] 4.4 Confirm: 覆盖账本四行全 🟢；指南 §5.1 复核（自愈提示与手工步骤并存，401 指引衔接 3.2/§5.2）。
+- [ ] 3.1 Run: `bun test tests/scripts/install-via-npm.test.ts` 全绿（新增 4 个命名测试 + 既有 13 个）。
+- [ ] 3.2 Run: 仓库根 `bun test` 全量，无回归。
+- [ ] 3.3 Run: `openspec validate fix-windows-tokens-shim-resolution` 通过。
+- [ ] 3.4 Confirm: 覆盖账本四行全 🟢。
