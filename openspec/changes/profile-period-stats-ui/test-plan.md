@@ -4,14 +4,14 @@
 
 | Requirement | Scenario | Test File | Test Name | Initial State |
 |-------------|----------|-----------|-----------|---------------|
-| specs/web-profile-stats-display/spec.md → 更新时间显示到时分 | 有提交记录时显示到分钟 | tests/e2e/profile-period-stats.spec.ts | e2e: updated time shows hours and minutes without seconds | 🔴 red |
-| specs/web-profile-stats-display/spec.md → 更新时间显示到时分 | 无提交记录时不显示更新时间 | tests/e2e/profile-period-stats.spec.ts | e2e: no "Updated" text for user without submissions | 🔴 red |
-| specs/web-profile-stats-display/spec.md → 周期筛选下隐藏不可切片的会话数 | 周期为本周时隐藏会话数 | tests/e2e/profile-period-stats.spec.ts | e2e: session hint hidden under week period | 🔴 red |
-| specs/web-profile-stats-display/spec.md → 周期筛选下隐藏不可切片的会话数 | 周期为全部时间时显示会话数 | tests/e2e/profile-period-stats.spec.ts | e2e: session hint shown under all-time period | 🔴 red |
-| specs/web-profile-stats-display/spec.md → 周期筛选下隐藏不可切片的会话数 | 全量会话数真实为 0 | tests/e2e/profile-period-stats.spec.ts | e2e: genuine zero session count still displayed under all-time | 🔴 red |
-| specs/web-profile-stats-display/spec.md → 周期筛选下标明提交次数为全量数据 | 周期为本月时标注全量语义 | tests/e2e/profile-period-stats.spec.ts | e2e: submission count shows 全部时间 hint under month period | 🔴 red |
-| specs/web-profile-stats-display/spec.md → 周期筛选下标明提交次数为全量数据 | 周期为全部时间时维持现状 | tests/e2e/profile-period-stats.spec.ts | e2e: no hint under submissions stat for all-time | 🔴 red |
-| specs/web-profile-stats-display/spec.md → 周期筛选下标明提交次数为全量数据 | 英文语言下使用既有回退文案 | tests/e2e/profile-period-stats.spec.ts | e2e: "All time" hint renders under en locale | 🔴 red |
+| specs/web-profile-stats-display/spec.md → 更新时间显示到时分 | 有提交记录时显示到分钟 | tests/e2e/profile-period-stats.spec.ts | e2e: updated time shows hours and minutes without seconds | 🟢 green |
+| specs/web-profile-stats-display/spec.md → 更新时间显示到时分 | 无提交记录时不显示更新时间 | tests/e2e/profile-period-stats.spec.ts | e2e: no "Updated" text for user without submissions | 🟢 green |
+| specs/web-profile-stats-display/spec.md → 周期筛选下隐藏不可切片的会话数 | 周期为本周时隐藏会话数 | tests/e2e/profile-period-stats.spec.ts | e2e: session hint hidden under week period | 🟢 green |
+| specs/web-profile-stats-display/spec.md → 周期筛选下隐藏不可切片的会话数 | 周期为全部时间时显示会话数 | tests/e2e/profile-period-stats.spec.ts | e2e: session hint shown under all-time period | 🟢 green |
+| specs/web-profile-stats-display/spec.md → 周期筛选下隐藏不可切片的会话数 | 全量会话数真实为 0 | tests/e2e/profile-period-stats.spec.ts | e2e: genuine zero session count still displayed under all-time | 🟢 green |
+| specs/web-profile-stats-display/spec.md → 周期筛选下标明提交次数为全量数据 | 周期为本月时标注全量语义 | tests/e2e/profile-period-stats.spec.ts | e2e: submission count shows 全部时间 hint under month period | 🟢 green |
+| specs/web-profile-stats-display/spec.md → 周期筛选下标明提交次数为全量数据 | 周期为全部时间时维持现状 | tests/e2e/profile-period-stats.spec.ts | e2e: no hint under submissions stat for all-time | 🟢 green |
+| specs/web-profile-stats-display/spec.md → 周期筛选下标明提交次数为全量数据 | 英文语言下使用既有回退文案 | tests/e2e/profile-period-stats.spec.ts | e2e: "All time" hint renders under en locale | 🟢 green |
 
 ## Coverage Notes
 

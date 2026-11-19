@@ -285,7 +285,12 @@ export function ProfileView({
                 <>
                   <span aria-hidden="true">·</span>
                   <span suppressHydrationWarning>
-                    {t("profile.updated", { date: new Date(updatedAt).toLocaleDateString(intlTag(locale)) })}
+                    {t("profile.updated", {
+                      date: new Date(updatedAt).toLocaleString(intlTag(locale), {
+                        dateStyle: "medium",
+                        timeStyle: "short",
+                      }),
+                    })}
                   </span>
                 </>
               )}
@@ -319,11 +324,16 @@ export function ProfileView({
         <Stat
           label={t("profile.activeDays")}
           value={formatNumber(stats.activeDays, false)}
-          hint={t("profile.sessions", { n: formatNumber(stats.sessionCount, false) })}
+          hint={
+            period === "all"
+              ? t("profile.sessions", { n: formatNumber(stats.sessionCount, false) })
+              : undefined
+          }
         />
         <Stat
           label={t("profile.submissions")}
           value={formatNumber(stats.submissionCount, false)}
+          hint={period !== "all" ? t("profile.periodAll") : undefined}
         />
       </section>
 
