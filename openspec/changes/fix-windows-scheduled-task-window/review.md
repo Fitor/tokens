@@ -117,3 +117,63 @@ CHANGES_APPLIED: yes
 - **S5（📌）**：`register-tokens-submit-task.ps1:103` 与 `:112` 的收尾提示把任务历史当提交成功证据（「是否提交成功以任务历史记录和本站榜单为准」）。这与 RC1 口径不一致。该文件非本次评审工件。建议实现时顺手改为「任务历史只反映任务退出码；提交成功看榜单」。「runner 内容不变」不约束这些提示行。
 
 RC6 已按指定修法应用，作者翻转 `CHANGES_APPLIED: yes`。S4 已应用。S5 落为 tasks.md 一项。
+
+## Amendment Record（round 3 前置，2026-11-18）
+
+实施前的锚点核对发现一处变量名笔误：tasks 1.2、spec 场景 2、test-plan 锚点清单把 launcher 命令行要包引号的路径写成 `$escapedTokensPath`。该变量是 tokens CLI 路径（npm shim），runner 内部用它调 `& '<cli>' submit`。launcher 的 `WshShell.Run` 命令行要转启的是 runner（`%LOCALAPPDATA%\tokens\tokens-submit.ps1`，变量 `$RunnerPath`）。照原文实施，vbs 会执行 `powershell.exe -File <tokens.cmd>`。runner 不会启动，`submit` 子命令不会传。提交功能整体失效。design D3/D4 与 spec 场景 4 本来就写「runner 路径」，原文与之矛盾。
+
+用户裁决：修正锚点并重跑评审。修订四处：
+
+1. spec 场景 2 THEN：「并引用 `$escapedTokensPath`」改为「并引用 runner 路径变量 `$RunnerPath`」。
+2. tasks 1.2：「命令行双引号包裹 `powershell.exe` 与 `$escapedTokensPath`」改为「与 `$RunnerPath`（runner 路径，design D3/D4）」。
+3. test-plan Coverage Notes 锚点清单：`$escapedTokensPath` 改为 `$RunnerPath`。
+4. design D4：「runner 路径」改为「runner 路径（`$RunnerPath`）」。
+
+reviewed 工件变更后原 verdict 作废。执行 round 3 复核。
+
+## Recheck Record（round 3，2026-11-18）
+
+复核人是 fresh-context subagent（同模型，独立上下文，只读；唯一输出为结论文本，由 lead 转录）。复核范围是上述四处修正与周边一致性。
+
+结论：四处修正全部落实。无残留误引（`$escapedTokensPath` 只剩本文件对 runner 内容的描述，属正确用法）。修正后 spec 场景 2、场景 4、design D3/D4、tasks 1.2、test-plan 锚点清单对「launcher 转启 runner、命令行双引号包裹 `powershell.exe` 与 runner 路径」口径一致。`$RunnerPath` 是脚本真实变量（register-tokens-submit-task.ps1:29）。场景 2 其余锚点维持 text/regex/byte-only 标准。场景 4「引号加倍」与 D4「撇号免转义」针对不同字符与语境，自洽。0 Critical、0 Moderate、3 Suggestions。
+
+- **S1（📌）**：design D7 锚点枚举与 test-plan 清单不同步。已应用：D7 补 `$RunnerPath`、`Remove-Item`、`exit 0`，与 test-plan 十项对齐。— accepted by reviewer（回执：design.md:46 已含三锚点，逐一对齐。）
+- **S2（📌）**：spec 场景 4 THEN 的「runner 路径」绑定变量名。已应用：改为「runner 路径（`$RunnerPath`）」。— accepted by reviewer（回执：spec.md:29 落实。）
+- **S3（📌）**：spec 场景 2 THEN 末句再字面化一档。已应用：改为「写入内容含字面串 `WshShell.Run`、`, 0, True`、`powershell.exe`、`$RunnerPath`（runner 路径变量）」。— accepted by reviewer（回执：spec.md:17 落实，维持断言标准。）
+
+## Verdict（round 3，取代前轮）
+
+VERDICT: APPROVE
+
+四处修正与三条建议确认后，工件口径一致、锚点可机械断言。无 Required Changes。`CHANGES_APPLIED: yes` 维持成立。
+
+## Amendment Record（round 4 前置，2026-11-19）
+
+Windows 实机门禁首轮回执证伪 D5 的「WSH 识别 BOM」论断：LastTaskResult = 1，`cscript.exe //Nologo tokens-submit-hidden.vbs` 报「Microsoft VBScript 编译器错误：无效字符 (1, 1)」。WSH 的脚本编码支持只有 ANSI 与带 BOM 的 UTF-16 LE。launcher 写成 UTF-8 with BOM 时，BOM 字节被按 ANSI 读进第 1 行，直接编译错误。机械断言只锁编码 API 的字面锚点，锁不住 WSH 运行时编码行为。
+
+用户既定路线：修正后重审。修订六处：
+
+1. design D5 整段改写：结论改为「写入带 BOM 的 UTF-16 LE」，API 改 `[System.Text.UnicodeEncoding]::new($false, $true)`（小端、带 BOM），断言锚点改 `UnicodeEncoding`。
+2. design D7 锚点枚举同步。
+3. spec 需求句改「launcher 必须以带 BOM 的 UTF-16 LE 写入」，场景 2 THEN 的编码锚点同步。
+4. tasks 1.2 的写入 API 与编码同步。
+5. test-plan 锚点清单同步。
+6. 实现与测试断言同步（`register-tokens-submit-task.ps1` 与 `tests/scripts/register-scheduled-task-window.test.ts`）。
+
+reviewed 工件变更后 round 3 结论作废。执行 round 4 复核。
+
+## Recheck Record（round 4，2026-11-19）
+
+复核人是 fresh-context subagent（同模型，独立上下文，只读；唯一输出为结论文本，由 lead 转录）。复核范围是上述六处修正与周边一致性。
+
+结论：六处修正全部落实。无残留误引（本文件前轮历史记录属留痕；design 与 ps1 注释对「UTF-8 为何不行」的论断、runner 的 `Set-Content -Encoding UTF8` 均属正确用法）。UTF-16 LE with BOM 是 WSH 可执行脚本编码。`UnicodeEncoding]::new($false, $true)` 确为小端带 BOM。spec、design、tasks、test-plan、实现、测试六处同口径。非 ASCII 路径在新编码下不依赖系统 codepage。引号加倍与退出码回传语义不受编码改动影响。机械断言维持 text/regex/byte-only 标准。0 Critical、0 Moderate、3 Suggestions。
+
+- **S1（📌）**：书面锚点 `UnicodeEncoding` 与 `$true` 可被大端 `::new($true, $true)` 命中，比测试严格度宽松。已应用：四处锚点收紧为完整字面 `UnicodeEncoding]::new($false, $true)`，design D5 补「`$false` 即小端，WSH 不接受大端」。— accepted by reviewer（回执：四处逐字落实，大端形态不再命中任何锚点，书面口径与测试严格度一致。）
+- **S2（📌）**：verify.md 的审查完整性记录过期。处置：本记录落盘后同步补记 verify.md。— accepted by reviewer（回执：处置接受，延后落盘证据链成立。）
+- **S3（📌）**：变更目录残留 vim 交换文件 `.tasks.md.swp`。处置：该文件 08:38 生成且本机 3 个 vim 会话运行，删除会破坏对应会话的崩溃保护；保持未跟踪、提交时排除，会话关闭后由用户清理。— accepted by reviewer（回执：比删除更安全，需确保 commit 不含该文件。）
+
+## Verdict（round 4，取代 round 3 结论）
+
+VERDICT: APPROVE
+
+六处编码修法与 S1 收紧确认后，工件口径一致、锚点完整字面、可机械断言。无 Required Changes。round 3 之后的唯一工件改动链（round 4 编码修法六处＋S1 收紧四处）全部经评审确认，链条完整。

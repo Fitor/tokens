@@ -146,4 +146,6 @@ curl -fsSL https://<线上域名>/enable-tokens-service.sh | bash -s -- https://
 iex "& { $(irm https://<线上域名>/register-tokens-submit-task.ps1) } -Site https://<线上域名>"
 ```
 
+Windows 计划任务的启动链路是 `wscript → vbs → runner`。任务用 `wscript.exe` 启动 `%LOCALAPPDATA%\tokens\tokens-submit-hidden.vbs`。该 launcher 以隐藏窗口转启 runner（`tokens-submit.ps1`）。这样任务触发时不在桌面弹 PowerShell 窗口。排查提示：任务从不运行时，先查组策略（GPO）是否禁用了 `wscript.exe`。被禁用时 launcher 无法启动，任务静默不跑。
+
 两个脚本都只配置常驻提交与站点指向：不登录、不 logout，凭据直接复用。Linux 上 `tokens serve` 与常驻服务二选一，别同时跑。卸载：Linux `systemctl --user disable --now tokens`；Windows 重跑脚本加 `-Remove`。

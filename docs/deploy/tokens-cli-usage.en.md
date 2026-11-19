@@ -149,4 +149,6 @@ curl -fsSL https://<production-domain>/enable-tokens-service.sh | bash -s -- htt
 iex "& { $(irm https://<production-domain>/register-tokens-submit-task.ps1) } -Site https://<production-domain>"
 ```
 
+The Windows scheduled task starts through `wscript → vbs → runner`. The task runs `wscript.exe`, which starts `%LOCALAPPDATA%\tokens\tokens-submit-hidden.vbs`. That launcher starts the runner (`tokens-submit.ps1`) with a hidden window. This keeps the task from popping up a PowerShell window on the desktop. Troubleshooting: if the task never runs, check whether Group Policy (GPO) has disabled `wscript.exe`. A disabled `wscript.exe` stops the launcher, and the task silently does nothing.
+
 Both scripts only configure resident submit and the site URL. They do not log in or log out. Existing credentials are reused. On Linux, do not run `tokens serve` and the resident service together. Uninstall: Linux `systemctl --user disable --now tokens`; Windows, rerun the script with `-Remove`.

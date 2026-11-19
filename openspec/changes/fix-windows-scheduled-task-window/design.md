@@ -34,16 +34,16 @@
 等待返回值是 powershell 的进程退出码。任务结果只反映该退出码。runner 不含 `exit $LASTEXITCODE`。`tokens submit` 的专属退出码不进任务结果。这一现状不在本次改动范围。备选 `Run(cmd, 0, False)` 让 wscript 立即退出：任务结果恒为 0，无法区分 runner 是否执行完。该备选下任务即刻结束，上一次提交未结束时下一次触发还会再起一个进程。前提是任务沿用 `Register-ScheduledTask` 的默认多实例策略「不启动新实例」，它只对仍处于运行状态的任务生效。弃用。代价是 wscript 隐藏驻留到提交结束，与今天 powershell 驻留等长。
 
 **D4 vbs 命令行的引号规则。**
-`WshShell.Run` 的命令行把 `powershell.exe` 与 runner 路径都用双引号包裹，路径含空格时正确。撇号（如 `C:\Users\O'Brien`）在 vbs 双引号字符串里无需转义，与 ps1 单引号规则不同。嵌入字符串的双引号做加倍转义，防御性保留。`-NoProfile -WindowStyle Hidden` 保留在命令行里，双保险。
+`WshShell.Run` 的命令行把 `powershell.exe` 与 runner 路径（`$RunnerPath`）都用双引号包裹，路径含空格时正确。撇号（如 `C:\Users\O'Brien`）在 vbs 双引号字符串里无需转义，与 ps1 单引号规则不同。嵌入字符串的双引号做加倍转义，防御性保留。`-NoProfile -WindowStyle Hidden` 保留在命令行里，双保险。
 
-**D5 vbs 用 .NET API 写入带 BOM 的 UTF-8。**
-写入用 `[System.IO.File]::WriteAllText`。编码用 `[System.Text.UTF8Encoding]::new($true)` 构造。`Set-Content -Encoding` 与 `Out-File -Encoding` 只收枚举，不收 Encoding 对象，不能用。`Set-Content -Encoding UTF8` 在 Windows PowerShell 5.1 写出 BOM。pwsh 7 的同名选项写无 BOM。docs 的执行入口指向 5.1，但脚本不拒绝 pwsh 执行。写入因此不依赖宿主版本。WSH 识别 BOM，非 ASCII 的用户目录路径不会乱码。无 BOM 时 wscript 按 ANSI 解析，中文用户名路径会被写坏。断言锚点是 `UTF8Encoding` 与 `$true`。
+**D5 vbs 用 .NET API 写入带 BOM 的 UTF-16 LE。**
+WSH 的脚本编码支持只有两种：ANSI 与带 BOM 的 UTF-16 LE。UTF-8 无论带不带 BOM 都被按 ANSI 读；带 BOM 时首行多出无效字符，直接编译错误（实机证据：cscript 报「VBScript 编译器错误：无效字符 (1,1)」）。写入用 `[System.IO.File]::WriteAllText`。编码用 `[System.Text.UnicodeEncoding]::new($false, $true)` 构造（小端、带 BOM）。`Set-Content -Encoding` 与 `Out-File -Encoding` 只收枚举，不收 Encoding 对象，不能用。UTF-16 LE with BOM 的写入不依赖宿主版本，非 ASCII 的用户目录路径不依赖系统 codepage。断言锚点是 `UnicodeEncoding]::new($false, $true)`。`$false` 即小端，WSH 不接受大端。
 
 **D6 Action 参数带 `//B //Nologo`。**
 `//B` 抑制脚本错误对话框。没有它，vbs 运行时错误会弹对话框，等于把问题换了个名字。`//Nologo` 抑制横幅。
 
 **D7 验证沿用机械文本断言，实机行为留人工门禁。**
-断言锚点：`wscript.exe`、`//B //Nologo`、`tokens-submit-hidden.vbs`、`WshShell.Run`、`, 0, True`、`WScript.Quit`、`UTF8Encoding`。不做整段文本比对。场景与测试 1:1，覆盖账本进 test-plan。Windows 实机门禁：连续两次触发全程无窗口。任务历史显示 `wscript.exe` 启动且 LastTaskResult 为 0。榜单显示两次提交成功。与既有 change 同口径。
+断言锚点：`wscript.exe`、`//B //Nologo`、`tokens-submit-hidden.vbs`、`WshShell.Run`、`, 0, True`、`WScript.Quit`、`UnicodeEncoding]::new($false, $true)`、`$RunnerPath`、`Remove-Item`、`exit 0`。不做整段文本比对。场景与测试 1:1，覆盖账本进 test-plan。Windows 实机门禁：连续两次触发全程无窗口。任务历史显示 `wscript.exe` 启动且 LastTaskResult 为 0。榜单显示两次提交成功。与既有 change 同口径。
 
 ## Risks / Trade-offs
 

@@ -2,7 +2,7 @@
 
 ### Requirement: 计划任务触发不得创建可见窗口
 
-`register-tokens-submit-task.ps1` 注册计划任务时，必须用无窗口宿主启动 runner。计划任务的 Action 可执行文件必须是 `wscript.exe`。Action 参数必须含 `//B //Nologo` 与 launcher 路径。launcher 路径在 Action 参数中必须用双引号包裹。脚本必须把 launcher 写到 `%LOCALAPPDATA%\tokens\tokens-submit-hidden.vbs`。launcher 必须以带 BOM 的 UTF-8 写入。launcher 必须用 `WshShell.Run` 启动 runner，窗口样式参数必须是 `0`。launcher 必须等待 runner 结束，并把 powershell 进程的退出码经 `WScript.Quit` 回传给计划任务。runner 内容、`tokens submit` 调用结构、提交间隔、登录类型保持不变。`-Remove` 必须同时删除 launcher 文件。`-DryRun` 不得写入或删除任何文件。本机无 Windows 环境时，ps1 与 vbs 行为用机械文本断言验证。
+`register-tokens-submit-task.ps1` 注册计划任务时，必须用无窗口宿主启动 runner。计划任务的 Action 可执行文件必须是 `wscript.exe`。Action 参数必须含 `//B //Nologo` 与 launcher 路径。launcher 路径在 Action 参数中必须用双引号包裹。脚本必须把 launcher 写到 `%LOCALAPPDATA%\tokens\tokens-submit-hidden.vbs`。launcher 必须以带 BOM 的 UTF-16 LE 写入。launcher 必须用 `WshShell.Run` 启动 runner，窗口样式参数必须是 `0`。launcher 必须等待 runner 结束，并把 powershell 进程的退出码经 `WScript.Quit` 回传给计划任务。runner 内容、`tokens submit` 调用结构、提交间隔、登录类型保持不变。`-Remove` 必须同时删除 launcher 文件。`-DryRun` 不得写入或删除任何文件。本机无 Windows 环境时，ps1 与 vbs 行为用机械文本断言验证。
 
 #### Scenario: Action 由 wscript 启动（机械检查）
 
@@ -14,7 +14,7 @@
 
 - **GIVEN** 仓库根 `register-tokens-submit-task.ps1` 的文本
 - **WHEN** 检查 launcher 的写入动作与写入内容
-- **THEN** 文本含 `tokens-submit-hidden.vbs` 的写入动作。写入编码写法含 `UTF8Encoding` 与 `$true`。写入内容含字面串 `WshShell.Run`、`, 0, True`、`powershell.exe`，并引用 `$escapedTokensPath`
+- **THEN** 文本含 `tokens-submit-hidden.vbs` 的写入动作。写入编码写法含 `UnicodeEncoding]::new($false, $true)`。写入内容含字面串 `WshShell.Run`、`, 0, True`、`powershell.exe`、`$RunnerPath`（runner 路径变量）
 
 #### Scenario: 退出码回传任务历史（机械检查）
 
@@ -26,7 +26,7 @@
 
 - **GIVEN** 仓库根 `register-tokens-submit-task.ps1` 的文本
 - **WHEN** 检查 launcher 命令行的引号处理
-- **THEN** launcher 的 Run 命令行把 `powershell.exe` 与 runner 路径都用双引号包裹。文本对嵌入 vbs 字符串的双引号做加倍转义
+- **THEN** launcher 的 Run 命令行把 `powershell.exe` 与 runner 路径（`$RunnerPath`）都用双引号包裹。文本对嵌入 vbs 字符串的双引号做加倍转义
 
 #### Scenario: -Remove 同步清理 launcher（机械检查）
 
