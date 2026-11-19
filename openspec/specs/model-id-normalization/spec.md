@@ -2,7 +2,7 @@
 
 ## Purpose
 
-TBD — 此新能力的主规格由 change `fix-multibyte-model-id-panic` 的增量创建，增量未提供 `## Purpose` 正文。请补充描述：该能力做什么、为何存在。
+model-id-normalization 定义 model_id 的本地归一化规则。归一化折叠这些写法差异：大小写、已配置网关前缀、`(reasoning-tier)` 后缀、尾部 `-YYYYMMDD` 日期、claude 版本号的 `.`→`-` 重写、`anthropic/claude-` 前缀。`canonical_model_id` 用它产出上报身份。`normalize_model_for_grouping` 在它之上叠加展示用别名折叠，产出本地分组名。本能力约束两点：归一化对任意 UTF-8 输入安全，不 panic；纯 ASCII 输入的输出保持不变。同一 model 的各种写法因此聚到同一分组，历史数据不因写法差异而分裂。
 
 ## Requirements
 
