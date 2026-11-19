@@ -139,13 +139,17 @@ pub(crate) fn normalize_syntactic(model_id: &str) -> String {
     if let Some(base_model) = strip_parenthesized_reasoning_tier(&name) {
         name = base_model.to_string();
     }
-    if name.len() > 9 {
-        let potential_date = &name[name.len() - 8..];
-        if potential_date.chars().all(|c| c.is_ascii_digit())
-            && name.as_bytes()[name.len() - 9] == b'-'
-        {
-            name = name[..name.len() - 9].to_string();
-        }
+    // Strip a trailing `-YYYYMMDD`. Validate the bytes before slicing: when the
+    // last 8 bytes are ASCII digits and byte len-9 is `-`, both len-8 and len-9
+    // are guaranteed char boundaries, so the truncate cannot panic even when the
+    // name contains multi-byte characters.
+    if name.len() > 9
+        && name.as_bytes()[name.len() - 9] == b'-'
+        && name.as_bytes()[name.len() - 8..]
+            .iter()
+            .all(|b| b.is_ascii_digit())
+    {
+        name.truncate(name.len() - 9);
     }
 
     if name.contains("claude") {
